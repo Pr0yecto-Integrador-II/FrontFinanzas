@@ -1,0 +1,108 @@
+:host {
+  display: grid;
+  min-height: 100dvh;
+  grid-template-rows: auto 1fr;
+}
+
+.hero {
+  background: var(--c-hero);
+  color: var(--c-on-hero);
+  padding: 28px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Líneas de contorno: referencia a una gráfica de saldo, sin imágenes */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -10% -40% -10%;
+  height: 80%;
+  background:
+    repeating-radial-gradient(
+      ellipse at 80% 120%,
+      transparent 0 26px,
+      color-mix(in srgb, var(--c-on-hero) 10%, transparent) 26px 27px
+    );
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--c-on-hero) 14%, transparent);
+}
+.name {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pitch {
+  position: relative;
+  z-index: 1;
+}
+.big {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+  max-width: 16ch;
+}
+ul {
+  display: none;
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  gap: 14px;
+  flex-direction: column;
+  color: var(--c-on-hero-muted);
+}
+li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+main {
+  display: grid;
+  place-items: start center;
+  padding: 0 16px 40px;
+  margin-top: -28px;
+  position: relative;
+  z-index: 2;
+}
+
+@media (min-width: 900px) {
+  :host {
+    grid-template-columns: minmax(380px, 46%) 1fr;
+    grid-template-rows: none;
+  }
+  .hero {
+    padding: 48px 56px;
+    justify-content: space-between;
+  }
+  .big {
+    font-size: 3.2rem;
+    max-width: 11ch;
+  }
+  ul {
+    display: flex;
+  }
+  main {
+    place-items: center;
+    margin-top: 0;
+    padding: 40px;
+  }
+}

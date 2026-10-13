@@ -1,0 +1,163 @@
+<div class="page">
+  <div class="page-head">
+    <h1>Movimientos</h1>
+    <a class="btn sm" routerLink="/movimientos/nuevo">
+      <span class="icon" aria-hidden="true">add</span> Nuevo
+    </a>
+  </div>
+
+  <div class="searchbar">
+    <label class="search">
+      <span class="icon" aria-hidden="true">search</span>
+      <span class="sr-only">Buscar en descripción y nota</span>
+      <input
+        type="search"
+        placeholder="Buscar en descripción y nota"
+        [value]="searchText()"
+        (input)="onSearch($any($event.target).value)"
+      />
+    </label>
+    <button
+      type="button"
+      class="btn ghost filter-btn"
+      (click)="panelOpen.set(!panelOpen())"
+      [attr.aria-expanded]="panelOpen()"
+      aria-controls="filters"
+    >
+      <span class="icon" aria-hidden="true">tune</span>
+      Filtros
+      @if (state.count()) {
+        <span class="badge">{{ state.count() }}</span>
+      }
+    </button>
+  </div>
+
+  @if (panelOpen()) {
+    <section id="filters" class="card panel" aria-label="Filtros">
+      <div class="field">
+        <span class="label">Periodo</span>
+        <div class="chips">
+          @for (p of periods; track p.key) {
+            <button type="button" class="chip" [attr.aria-pressed]="state.filters().period === p.key" (click)="setPeriod(p.key)">
+              {{ p.label }}
+            </button>
+          }
+        </div>
+        @if (state.filters().period === 'custom') {
+          <div class="two">
+            <label class="field">
+              <span class="hint">Desde</span>
+              <input type="date" class="input" [max]="today" [value]="state.filters().from ?? ''" (change)="state.patch({ from: $any($event.target).value || null })" />
+            </label>
+            <label class="field">
+              <span class="hint">Hasta</span>
+              <input type="date" class="input" [max]="today" [value]="state.filters().to ?? ''" (change)="state.patch({ to: $any($event.target).value || null })" />
+            </label>
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <span class="label">Tipo</span>
+        <div class="chips">
+          <button type="button" class="chip" [attr.aria-pressed]="state.filters().type === 'all'" (click)="state.patch({ type: 'all' })">Todos</button>
+          <button type="button" class="chip" [attr.aria-pressed]="state.filters().type === 'expense'" (click)="state.patch({ type: 'expense' })">Gastos</button>
+          <button type="button" class="chip" [attr.aria-pressed]="state.filters().type === 'income'" (click)="state.patch({ type: 'income' })">Ingresos</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Categorías</span>
+        <div class="chips">
+          @for (c of categories(); track c.id) {
+            <button type="button" class="chip" [attr.aria-pressed]="state.filters().categoryIds.includes(c.id)" (click)="toggleCategory(c.id)">
+              <span class="dot" [style.background]="c.color"></span>{{ c.name }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="two">
+        <label class="field">
+          <span class="label">Monto mínimo</span>
+          <input class="input" inputmode="decimal" placeholder="0" [value]="amountText(state.filters().minMinor)" (change)="setAmount('min', $any($event.target).value)" />
+        </label>
+        <label class="field">
+          <span class="label">Monto máximo</span>
+          <input class="input" inputmode="decimal" placeholder="Sin límite" [value]="amountText(state.filters().maxMinor)" (change)="setAmount('max', $any($event.target).value)" />
+        </label>
+      </div>
+
+      @if (tags().length) {
+        <div class="field">
+          <span class="label">Etiqueta</span>
+          <div class="chips">
+            @for (t of tags(); track t) {
+              <button type="button" class="chip" [attr.aria-pressed]="state.filters().tag === t" (click)="state.patch({ tag: state.filters().tag === t ? null : t })">
+                #{{ t }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <button type="button" class="btn text" (click)="clear()">Limpiar filtros</button>
+    </section>
+  }
+
+  @if (chips().length) {
+    <ul class="active-chips list" aria-label="Filtros activos">
+      @for (c of chips(); track c.key) {
+        <li class="fchip">
+          <span>{{ c.label }}</span>
+          <button type="button" (click)="c.remove()" [attr.aria-label]="'Quitar filtro ' + c.label">
+            <span class="icon" aria-hidden="true">close</span>
+          </button>
+        </li>
+      }
+      <li><button type="button" class="btn text sm" (click)="clear()">Limpiar filtros</button></li>
+    </ul>
+  }
+
+  @if (state.count() === 0) {
+    <app-pending-list />
+  }
+
+  @if (hasAny()) {
+    <p class="summary" role="status">
+      <strong>{{ totals().count }}</strong> {{ totals().count === 1 ? 'movimiento' : 'movimientos' }}
+      <span class="sep" aria-hidden="true"></span>
+      <span class="expense num">−{{ totals().expense | money }}</span>
+      <span class="income num">+{{ totals().income | money }}</span>
+    </p>
+  }
+
+  @for (g of groups(); track g.date) {
+    <section class="day" [attr.aria-label]="heading(g.date)">
+      <header class="day-head">
+        <h2>{{ heading(g.date) }}</h2>
+        <span class="net num" [class.income]="g.net > 0" [class.expense]="g.net < 0">{{ g.net | money: 'sign' }}</span>
+      </header>
+      <ul class="list card">
+        @for (t of g.items; track t.id) {
+          <li><app-tx-row [tx]="t" [category]="catOf(t.categoryId)" (open)="open($event)" /></li>
+        }
+      </ul>
+    </section>
+  } @empty {
+    @if (!hasAny()) {
+      <app-empty-state icon="receipt_long" text="Aún no tienes movimientos. Registra tu primer gasto con el botón +">
+        <a class="btn" routerLink="/movimientos/nuevo">Registrar gasto</a>
+      </app-empty-state>
+    } @else {
+      <app-empty-state icon="search_off" text="No hay movimientos con estos filtros">
+        <button type="button" class="btn" (click)="clear()">Limpiar filtros</button>
+      </app-empty-state>
+    }
+  }
+
+  <div #sentinel class="sentinel" aria-hidden="true"></div>
+  @if (hasMore()) {
+    <p class="muted loading">Cargando más…</p>
+  }
+</div>

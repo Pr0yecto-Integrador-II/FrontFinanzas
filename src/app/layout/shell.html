@@ -1,0 +1,76 @@
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<aside class="rail" aria-label="Navegación principal">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <span class="icon">account_balance_wallet</span>
+    </span>
+    <span class="brand-name">Finanzas</span>
+  </div>
+
+  <a class="btn add" routerLink="/movimientos/nuevo">
+    <span class="icon" aria-hidden="true">add</span>
+    Nuevo movimiento
+  </a>
+
+  <nav>
+    <ul class="list">
+      @for (item of main; track item.path) {
+        <li>
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: !!item.exact }"
+            class="rail-link"
+          >
+            <span class="icon" aria-hidden="true">{{ item.icon }}</span>
+            {{ item.label }}
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <div class="rail-foot">
+    <div class="status" [attr.data-tone]="status().tone" role="status">
+      <span class="icon" aria-hidden="true">{{ status().icon }}</span>
+      {{ status().text }}
+    </div>
+    <p class="who" [title]="email()">{{ email() }}</p>
+  </div>
+</aside>
+
+<div class="body">
+  @if (sync.offline()) {
+    <div class="offline-bar" role="status">
+      <span class="icon" aria-hidden="true">cloud_off</span>
+      Sin conexión. Tus cambios se guardan aquí y se envían cuando vuelva internet.
+    </div>
+  }
+
+  <main id="contenido" tabindex="-1">
+    <router-outlet />
+  </main>
+</div>
+
+<nav class="tabbar" aria-label="Navegación principal">
+  <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="tab">
+    <span class="icon" aria-hidden="true">home</span>
+    <span>Inicio</span>
+  </a>
+  <a routerLink="/movimientos" routerLinkActive="active" class="tab">
+    <span class="icon" aria-hidden="true">receipt_long</span>
+    <span>Movimientos</span>
+  </a>
+  <a routerLink="/movimientos/nuevo" class="fab" aria-label="Nuevo movimiento">
+    <span class="icon" aria-hidden="true">add</span>
+  </a>
+  <a routerLink="/presupuestos" routerLinkActive="active" class="tab">
+    <span class="icon" aria-hidden="true">donut_small</span>
+    <span>Presupuestos</span>
+  </a>
+  <a routerLink="/mas" routerLinkActive="active" class="tab">
+    <span class="icon" aria-hidden="true">menu</span>
+    <span>Más</span>
+  </a>
+</nav>

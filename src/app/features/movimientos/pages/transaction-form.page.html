@@ -1,0 +1,202 @@
+<div class="page narrow">
+  <div class="top">
+    <button type="button" class="icon-btn" (click)="close()" aria-label="Volver">
+      <span class="icon" aria-hidden="true">arrow_back</span>
+    </button>
+    <h1>{{ title() }}</h1>
+    @if (isEdit() && existing()) {
+      <button type="button" class="icon-btn del" (click)="remove()" aria-label="Eliminar movimiento">
+        <span class="icon" aria-hidden="true">delete</span>
+      </button>
+    } @else {
+      <span class="spacer"></span>
+    }
+  </div>
+
+  @if (missing()) {
+    <div class="banner error" role="alert">
+      <span class="icon" aria-hidden="true">search_off</span>
+      No encontramos este movimiento. <a routerLink="/movimientos">Volver al historial</a>
+    </div>
+  } @else {
+    @if (existing()?.syncState === 'rejected') {
+      <div class="banner error" role="alert">
+        <span class="icon" aria-hidden="true">error</span>
+        <span>
+          El servidor rechazó este cambio: {{ existing()?.rejection?.message }}
+          Corrige los datos y guarda de nuevo, o
+          <button type="button" class="linklike" (click)="discardRejected()">descártalo</button>.
+        </span>
+      </div>
+    }
+
+    <form (ngSubmit)="save()" [formGroup]="form" novalidate class="form">
+      <div class="seg" role="group" aria-label="Tipo de movimiento">
+        <button
+          type="button"
+          [class.on]="!isIncome()"
+          [attr.aria-pressed]="!isIncome()"
+          [disabled]="isEdit() && isIncome()"
+          (click)="setType('expense')"
+        >
+          <span class="icon" aria-hidden="true">south_west</span> Gasto
+        </button>
+        <button
+          type="button"
+          [class.on]="isIncome()"
+          [attr.aria-pressed]="isIncome()"
+          [disabled]="isEdit() && !isIncome()"
+          (click)="setType('income')"
+        >
+          <span class="icon" aria-hidden="true">north_east</span> Ingreso
+        </button>
+      </div>
+      @if (isEdit()) {
+        <p class="hint">El tipo no se puede cambiar. Para eso, elimina este movimiento y crea otro.</p>
+      }
+
+      <div class="amount-box" [class.invalid]="attempted() && errors().amount" [class.inc]="isIncome()">
+        <label for="amount" class="sr-only">Monto</label>
+        <span class="cur num" aria-hidden="true">{{ currencySymbol() }}</span>
+        <input
+          #amountInput
+          id="amount"
+          class="amount num"
+          formControlName="amount"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="0"
+          [attr.aria-invalid]="!!(attempted() && errors().amount)"
+          aria-describedby="amount-err"
+        />
+      </div>
+      <p id="amount-err" class="error-text" aria-live="polite">
+        @if ((attempted() || form.controls.amount.dirty) && errors().amount) {
+          {{ errors().amount }}
+        }
+      </p>
+
+      <fieldset class="field cats">
+        <legend class="label">{{ isIncome() ? 'Fuente' : 'Categoría' }}</legend>
+        <div class="grid" role="radiogroup">
+          @for (c of categories(); track c.id) {
+            <button
+              type="button"
+              role="radio"
+              class="cat"
+              [class.on]="categoryId() === c.id"
+              [attr.aria-checked]="categoryId() === c.id"
+              [style.--cc]="c.color"
+              (click)="categoryId.set(c.id)"
+            >
+              <span class="ic"><span class="icon" aria-hidden="true">{{ c.icon }}</span></span>
+              <span class="nm">{{ c.name }}</span>
+            </button>
+          }
+        </div>
+        @if (attempted() && errors().category) {
+          <span class="error-text">{{ errors().category }}</span>
+        }
+      </fieldset>
+
+      <div class="field">
+        <span class="label">Fecha</span>
+        <div class="dates">
+          <button type="button" class="chip" [attr.aria-pressed]="form.controls.occurredOn.value === today" (click)="pickDate(today)">Hoy</button>
+          <button type="button" class="chip" [attr.aria-pressed]="form.controls.occurredOn.value === yesterday" (click)="pickDate(yesterday)">Ayer</button>
+          <label class="chip picker" [class.on]="form.controls.occurredOn.value !== today && form.controls.occurredOn.value !== yesterday">
+            <span class="icon" aria-hidden="true">calendar_month</span>
+            <span>{{ dateLabel() }}</span>
+            <input type="date" formControlName="occurredOn" [max]="today" aria-label="Elegir otra fecha" />
+          </label>
+        </div>
+        @if (errors().date) {
+          <span class="error-text">{{ errors().date }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <label for="description">Descripción <span class="muted">(opcional)</span></label>
+        <input id="description" class="input" formControlName="description" maxlength="140" autocomplete="off" />
+        <span class="hint right" [class.over]="descCount() > maxDescription">{{ descCount() }}/{{ maxDescription }}</span>
+        @if (errors().description) {
+          <span class="error-text">{{ errors().description }}</span>
+        }
+      </div>
+
+      <button type="button" class="more" (click)="showMore.set(!showMore())" [attr.aria-expanded]="showMore()">
+        <span class="icon" aria-hidden="true">{{ showMore() ? 'expand_less' : 'expand_more' }}</span>
+        Nota y etiquetas
+      </button>
+
+      @if (showMore()) {
+        <div class="field">
+          <label for="note">Nota</label>
+          <textarea id="note" class="textarea" formControlName="note" rows="3"></textarea>
+          <span class="hint right" [class.over]="noteLength() > maxNote">{{ noteLength() }}/{{ maxNote }}</span>
+          @if (errors().note) {
+            <span class="error-text">{{ errors().note }}</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="tag">Etiquetas <span class="muted">(hasta {{ maxTags }})</span></label>
+          @if (tags().length) {
+            <ul class="tags list">
+              @for (t of tags(); track t) {
+                <li class="tag">
+                  <span>#{{ t }}</span>
+                  <button type="button" (click)="removeTag(t)" [attr.aria-label]="'Quitar etiqueta ' + t">
+                    <span class="icon" aria-hidden="true">close</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+          <div class="tag-add">
+            <input
+              id="tag"
+              class="input"
+              [value]="tagInput()"
+              (input)="tagInput.set($any($event.target).value)"
+              (keydown)="onTagKey($event)"
+              placeholder="Ej. viaje-cartagena"
+              autocomplete="off"
+            />
+            <button type="button" class="btn soft" (click)="addTag()">Agregar</button>
+          </div>
+          @if (tagError()) {
+            <span class="error-text">{{ tagError() }}</span>
+          }
+          @if (suggestions().length) {
+            <div class="sugg" aria-label="Etiquetas usadas antes">
+              @for (s of suggestions(); track s) {
+                <button type="button" class="chip" (click)="useSuggestion(s)">#{{ s }}</button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (rule(); as r) {
+        <a class="origin" [routerLink]="['/recurrentes', r.id]">
+          <span class="icon" aria-hidden="true">event_repeat</span>
+          Generado por una regla recurrente. Editarlo solo cambia este movimiento.
+        </a>
+      }
+      @if (isEdit() && existing() && !existing()?.recurringRuleId) {
+        <a class="origin" [routerLink]="['/recurrentes/nueva']" [queryParams]="{ desde: existing()?.id }">
+          <span class="icon" aria-hidden="true">event_repeat</span>
+          Repetir este movimiento
+        </a>
+      }
+
+      <div class="actions">
+        <button type="button" class="btn ghost" (click)="close()">Cancelar</button>
+        <button type="submit" class="btn" [disabled]="saving() || (attempted() && !valid())">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

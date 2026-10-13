@@ -1,0 +1,152 @@
+.searchbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-surface);
+  color: var(--c-muted);
+}
+.search:focus-within {
+  border-color: var(--c-primary);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+}
+.filter-btn {
+  padding: 0 16px;
+}
+.badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: 0.75rem;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 4px 0 12px;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.fchip button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.fchip .icon {
+  font-size: 18px;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 2px 12px;
+  color: var(--c-muted);
+  font-size: 0.9375rem;
+}
+.summary .num {
+  font-weight: 700;
+}
+.sep {
+  width: 1px;
+  height: 14px;
+  background: var(--c-line);
+}
+
+.day {
+  margin-bottom: 16px;
+}
+.day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 4px 6px;
+}
+.day-head h2 {
+  font-size: 0.95rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--c-muted);
+}
+.net {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.day .list {
+  padding: 4px 12px;
+}
+.day .list li + li {
+  border-top: 1px solid var(--c-line);
+}
+
+.sentinel {
+  height: 1px;
+}
+.loading {
+  text-align: center;
+  padding: 12px;
+}

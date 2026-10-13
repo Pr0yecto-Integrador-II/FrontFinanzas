@@ -1,0 +1,86 @@
+<div class="page">
+  <div class="page-head">
+    <h1>Gráficos</h1>
+    <app-month-switcher [(month)]="month" />
+  </div>
+
+  @if (total() === 0 && !hasBars()) {
+    <app-empty-state icon="insights" text="Registra gastos para ver tus gráficos" />
+  } @else {
+    <div class="grid">
+      <section class="card" aria-labelledby="donut-title">
+        <h2 id="donut-title">Gastos por categoría · {{ monthTitle() }}</h2>
+
+        @if (slices().length) {
+          @defer (on viewport) {
+            <div class="donut-wrap">
+              <div echarts [options]="donut()" (chartClick)="onSliceClick($event)" class="chart donut" role="img" [attr.aria-label]="'Gráfico de dona con los gastos de ' + monthTitle()"></div>
+              <div class="center" aria-hidden="true">
+                <span class="muted">Total</span>
+                <strong class="num">{{ total() | money }}</strong>
+              </div>
+            </div>
+          } @placeholder {
+            <div class="chart donut skeleton"></div>
+          }
+
+          <table class="data">
+            <caption class="sr-only">Gasto por categoría</caption>
+            <thead>
+              <tr><th scope="col">Categoría</th><th scope="col" class="r">Monto</th><th scope="col" class="r">%</th></tr>
+            </thead>
+            <tbody>
+              @for (s of slices(); track s.key) {
+                <tr [class.link]="!!s.categoryId" (click)="openCategory(s.categoryId)">
+                  <th scope="row">
+                    <span class="dot" [style.background]="s.color"></span>
+                    @if (s.categoryId) {
+                      <button type="button" class="linklike" (click)="openCategory(s.categoryId); $event.stopPropagation()">{{ s.name }}</button>
+                    } @else {
+                      {{ s.name }}
+                    }
+                  </th>
+                  <td class="r num">{{ s.amountMinor | money }}</td>
+                  <td class="r num">{{ s.percent | number: '1.0-0' }} %</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <app-empty-state icon="insights" text="Registra gastos este mes para ver cómo se reparten." />
+        }
+      </section>
+
+      <section class="card" aria-labelledby="bars-title">
+        <h2 id="bars-title">Ingresos y gastos · últimos 6 meses</h2>
+        @defer (on viewport) {
+          <div echarts [options]="barOptions()" class="chart bars" role="img" aria-label="Gráfico de barras de ingresos y gastos de los últimos 6 meses"></div>
+        } @placeholder {
+          <div class="chart bars skeleton"></div>
+        }
+
+        <div class="legend" aria-hidden="true">
+          <span><i class="sw in"></i>Ingresos</span>
+          <span><i class="sw out"></i>Gastos</span>
+        </div>
+
+        <table class="data">
+          <caption class="sr-only">Ingresos, gastos y balance por mes</caption>
+          <thead>
+            <tr><th scope="col">Mes</th><th scope="col" class="r">Ingresos</th><th scope="col" class="r">Gastos</th><th scope="col" class="r">Balance</th></tr>
+          </thead>
+          <tbody>
+            @for (b of bars(); track b.month) {
+              <tr>
+                <th scope="row">{{ monthShort(b.month) }}</th>
+                <td class="r num income">{{ b.income | money }}</td>
+                <td class="r num expense">{{ b.expense | money }}</td>
+                <td class="r num" [class.expense]="b.balance < 0">{{ b.balance | money }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    </div>
+  }
+</div>

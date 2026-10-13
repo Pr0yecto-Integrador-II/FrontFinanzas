@@ -1,0 +1,120 @@
+<div class="page">
+  <div class="page-head">
+    <h1>Resumen</h1>
+    <app-month-switcher [(month)]="month" />
+  </div>
+
+  <div class="layout">
+    <section class="hero" aria-labelledby="bal-label">
+      <p id="bal-label" class="hero-label">Balance de {{ title() }}</p>
+      <p class="hero-amount num" [class.neg]="totals().balance < 0">{{ totals().balance | money }}</p>
+
+      @if (split(); as s) {
+        <div class="split" role="img" [attr.aria-label]="'Ingresos ' + (s.income | number: '1.0-0') + ' % y gastos ' + (s.expense | number: '1.0-0') + ' %'">
+          @if (s.income > 0) {
+            <span class="in" [style.width.%]="s.income"></span>
+          }
+          @if (s.expense > 0) {
+            <span class="out" [style.width.%]="s.expense"></span>
+          }
+        </div>
+      } @else {
+        <div class="split empty" aria-hidden="true"></div>
+      }
+
+      <dl class="flows">
+        <div>
+          <dt><span class="dot in"></span>Ingresos</dt>
+          <dd class="num">{{ totals().income | money }}</dd>
+          <dd class="var">{{ arrow(incomeVar()) }} vs. mes anterior</dd>
+        </div>
+        <div>
+          <dt><span class="dot out"></span>Gastos</dt>
+          <dd class="num">{{ totals().expense | money }}</dd>
+          <dd class="var">{{ arrow(expenseVar()) }} vs. mes anterior</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="stack">
+      <app-pending-list />
+
+      @if (pending().count) {
+        <p class="hint outside">
+          Por confirmar: {{ pending().expense | money }} en gastos
+          @if (pending().income) {
+            y {{ pending().income | money }} en ingresos
+          }
+          (no está en el balance).
+        </p>
+      }
+
+      @if (upcoming().count) {
+        <a class="card upcoming" routerLink="/recurrentes/proximos">
+          <span class="icon" aria-hidden="true">event_repeat</span>
+          <span class="up-text">
+            <strong>Próximos este mes</strong>
+            <span class="muted">
+              {{ upcoming().count }} {{ upcoming().count === 1 ? 'pago' : 'pagos' }} programados
+            </span>
+          </span>
+          <span class="num up-amt">
+            @if (upcoming().expense) {
+              <span class="expense">−{{ upcoming().expense | money }}</span>
+            }
+            @if (upcoming().income) {
+              <span class="income">+{{ upcoming().income | money }}</span>
+            }
+          </span>
+        </a>
+      }
+    </div>
+
+    <section class="card top" aria-labelledby="top-title">
+      <h2 id="top-title">En qué gastas más</h2>
+      @if (top().length) {
+        <ol class="list">
+          @for (s of top(); track s.categoryId) {
+            <li class="top-item">
+              <app-category-badge
+                [icon]="s.category?.icon ?? 'more_horiz'"
+                [color]="s.category?.color ?? '#64748B'"
+                style="--size: 38px"
+              />
+              <div class="top-main">
+                <div class="top-line">
+                  <span>{{ s.category?.name ?? 'Sin categoría' }}</span>
+                  <span class="num">{{ s.amountMinor | money }}</span>
+                </div>
+                <div class="bar" aria-hidden="true">
+                  <span [style.width.%]="s.percent" [style.background]="s.category?.color ?? '#64748B'"></span>
+                </div>
+              </div>
+              <span class="pct num">{{ s.percent | number: '1.0-0' }} %</span>
+            </li>
+          }
+        </ol>
+      } @else {
+        <app-empty-state icon="insights" text="Registra gastos este mes para ver en qué se va tu dinero." />
+      }
+    </section>
+
+    <section class="card recent" aria-labelledby="rec-title">
+      <div class="recent-head">
+        <h2 id="rec-title">Últimos movimientos</h2>
+        <a routerLink="/movimientos">Ver todos</a>
+      </div>
+      @if (recent().length) {
+        <ul class="list">
+          @for (t of recent(); track t.id) {
+            <li><app-tx-row [tx]="t" [category]="catOf(t.categoryId)" (open)="openTx($event)" /></li>
+          }
+        </ul>
+      } @else if (isEmpty()) {
+        <app-empty-state icon="receipt_long" text="Aún no tienes movimientos. Registra tu primer gasto con el botón +">
+          <a class="btn" routerLink="/movimientos/nuevo">Registrar gasto</a>
+        </app-empty-state>
+      }
+    </section>
+  </div>
+</div>

@@ -1,0 +1,70 @@
+<div class="page">
+  <div class="page-head">
+    <h1>Presupuestos</h1>
+    <app-month-switcher [(month)]="month" />
+  </div>
+
+  @if (totals().count) {
+    <section class="card total" aria-labelledby="tot">
+      <div class="total-head">
+        <h2 id="tot">Total presupuestado</h2>
+        <span class="num t-amt">{{ totals().spent | money }} <span class="muted">de {{ totals().limit | money }}</span></span>
+      </div>
+      <div class="track big" role="progressbar" [attr.aria-valuenow]="pct(totals().status.percent)" aria-valuemin="0" aria-valuemax="100" aria-label="Gastado del total presupuestado">
+        <span [class]="'fill ' + totals().status.level" [style.width.%]="pct(totals().status.percent)"></span>
+      </div>
+      <p class="muted">
+        @if (totals().status.remaining >= 0) {
+          Te quedan {{ totals().status.remaining | money }} entre las categorías con presupuesto.
+        } @else {
+          Te pasaste por {{ -totals().status.remaining | money }} entre las categorías con presupuesto.
+        }
+      </p>
+    </section>
+  }
+
+  @if (withBudget().length) {
+    <ul class="list items">
+      @for (r of withBudget(); track r.category.id) {
+        <li>
+          <button type="button" class="card item" (click)="edit(r.category, r.budget)" [attr.aria-label]="'Editar presupuesto de ' + r.category.name">
+            <app-category-badge [icon]="r.category.icon" [color]="r.category.color" />
+            <span class="body">
+              <span class="line">
+                <strong>{{ r.category.name }}</strong>
+                <span class="num pct" [class]="r.status!.level">{{ r.status!.percent | number: '1.0-0' }} %</span>
+              </span>
+              <span class="track" role="progressbar" [attr.aria-valuenow]="pct(r.status!.percent)" aria-valuemin="0" aria-valuemax="100">
+                <span [class]="'fill ' + r.status!.level" [style.width.%]="pct(r.status!.percent)"></span>
+              </span>
+              <span class="line sub">
+                <span>{{ r.spent | money }} de {{ r.status!.limit | money }}</span>
+                @if (r.status!.remaining >= 0) {
+                  <span>Quedan {{ r.status!.remaining | money }}</span>
+                } @else {
+                  <span class="over-text">Excedido por {{ -r.status!.remaining | money }}</span>
+                }
+              </span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  } @else {
+    <app-empty-state icon="donut_small" text="Define un límite mensual para las categorías que te importan y te avisamos al 80 % y al 100 %." />
+  }
+
+  @if (without().length) {
+    <h2 class="sec">Sin presupuesto</h2>
+    <ul class="list card plain">
+      @for (r of without(); track r.category.id) {
+        <li class="row">
+          <app-category-badge [icon]="r.category.icon" [color]="r.category.color" style="--size: 38px" />
+          <span class="nm">{{ r.category.name }}</span>
+          <span class="muted spent num">{{ r.spent | money }}</span>
+          <button type="button" class="btn soft sm" (click)="edit(r.category, null)">Definir</button>
+        </li>
+      }
+    </ul>
+  }
+</div>

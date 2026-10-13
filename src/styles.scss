@@ -1,0 +1,441 @@
+@use '@angular/material' as mat;
+
+/* ───────── Tema de Angular Material (base) ─────────
+   La paleta real de la app vive en los tokens --c-* de abajo; aquí solo se
+   dejan listos los componentes de Material y luego se alinean con esos tokens. */
+html {
+  color-scheme: light dark;
+  @include mat.theme(
+    (
+      color: mat.$cyan-palette,
+      typography: (
+        plain-family: 'Figtree Variable',
+        brand-family: 'Bricolage Grotesque Variable',
+      ),
+      density: 0,
+    )
+  );
+}
+
+/* ───────── Tokens de diseño ───────── */
+:root {
+  --c-paper: #f1f5f3;
+  --c-surface: #ffffff;
+  --c-surface-2: #e9efec;
+  --c-ink: #0d1b17;
+  --c-muted: #5a6c66;
+  --c-line: #dbe4e0;
+  --c-primary: #0a6b5b;
+  --c-on-primary: #ffffff;
+  --c-primary-soft: #d5efe7;
+  --c-hero: #0a3d35;
+  --c-on-hero: #eafaf5;
+  --c-on-hero-muted: #9cc9bd;
+  --c-income: #12874f;
+  --c-expense: #cf3650;
+  --c-warn: #b86e00;
+  --c-income-soft: #dcf3e6;
+  --c-expense-soft: #fbe3e7;
+  --c-warn-soft: #fbedcf;
+  --c-focus: #0a6b5b;
+  --shadow-1: 0 1px 2px rgb(13 27 23 / 6%), 0 2px 8px rgb(13 27 23 / 5%);
+  --shadow-2: 0 8px 28px rgb(13 27 23 / 14%);
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --nav-h: 68px;
+  --font-body: 'Figtree Variable', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Figtree Variable', system-ui, sans-serif;
+}
+
+@mixin dark-tokens {
+  --c-paper: #09120f;
+  --c-surface: #101c18;
+  --c-surface-2: #172923;
+  --c-ink: #e4efeb;
+  --c-muted: #8fa69f;
+  --c-line: #223630;
+  --c-primary: #55d1b5;
+  --c-on-primary: #04211b;
+  --c-primary-soft: #14362e;
+  --c-hero: #0d3b33;
+  --c-on-hero: #e9faf5;
+  --c-on-hero-muted: #8fc7b9;
+  --c-income: #4cd18f;
+  --c-expense: #ff7a8d;
+  --c-warn: #f3b44f;
+  --c-income-soft: #123626;
+  --c-expense-soft: #3d1a22;
+  --c-warn-soft: #3b2c0c;
+  --c-focus: #55d1b5;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-2: 0 10px 32px rgb(0 0 0 / 55%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include dark-tokens;
+  }
+}
+:root[data-theme='dark'] {
+  @include dark-tokens;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* Material alineado con los tokens propios */
+:root {
+  --mat-sys-primary: var(--c-primary);
+  --mat-sys-on-primary: var(--c-on-primary);
+  --mat-sys-primary-container: var(--c-primary-soft);
+  --mat-sys-on-primary-container: var(--c-ink);
+  --mat-sys-surface: var(--c-surface);
+  --mat-sys-surface-container: var(--c-surface);
+  --mat-sys-surface-container-high: var(--c-surface);
+  --mat-sys-surface-container-highest: var(--c-surface-2);
+  --mat-sys-on-surface: var(--c-ink);
+  --mat-sys-on-surface-variant: var(--c-muted);
+  --mat-sys-outline: var(--c-line);
+  --mat-sys-outline-variant: var(--c-line);
+  --mat-sys-error: var(--c-expense);
+  --mat-sys-background: var(--c-paper);
+  --mat-sys-on-background: var(--c-ink);
+  --mat-dialog-container-shape: 24px;
+  --mat-menu-container-shape: 14px;
+}
+
+/* ───────── Base ───────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1.15;
+}
+h1 {
+  font-size: 1.75rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+h3 {
+  font-size: 1.05rem;
+}
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--c-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.icon {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  flex: none;
+}
+
+/* Cifras alineadas para montos */
+.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+.income {
+  color: var(--c-income);
+}
+.expense {
+  color: var(--c-expense);
+}
+.muted {
+  color: var(--c-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ───────── Piezas reutilizables ───────── */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  padding: 16px;
+}
+
+.page {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 16px calc(var(--nav-h) + 40px);
+}
+@media (min-width: 960px) {
+  .page {
+    padding: 32px 40px 56px;
+  }
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* Botones */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--c-ink);
+  border-color: var(--c-line);
+}
+.btn.soft {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+.btn.danger {
+  background: var(--c-expense);
+  color: #fff;
+}
+.btn.text {
+  background: transparent;
+  color: var(--c-primary);
+  padding: 0 12px;
+}
+.btn.block {
+  width: 100%;
+}
+.btn.sm {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--c-ink);
+}
+.icon-btn:hover {
+  background: var(--c-surface-2);
+}
+
+/* Campos */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field > label,
+.field > .label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--c-line);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font: inherit;
+}
+.textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 22%, transparent);
+}
+.input.invalid,
+.select.invalid {
+  border-color: var(--c-expense);
+}
+.hint {
+  font-size: 0.8125rem;
+  color: var(--c-muted);
+}
+.error-text {
+  font-size: 0.8125rem;
+  color: var(--c-expense);
+  font-weight: 500;
+}
+
+.banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+}
+.banner.error {
+  background: var(--c-expense-soft);
+  color: var(--c-expense);
+}
+.banner.info {
+  background: var(--c-primary-soft);
+  color: var(--c-ink);
+}
+.banner.warn {
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+}
+
+/* Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--c-line);
+  background: var(--c-surface);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.chip[aria-pressed='true'],
+.chip.on {
+  background: var(--c-primary-soft);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+/* Lista agrupada */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Material: snackbar y diálogos con la identidad de la app */
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--c-ink);
+  --mdc-snackbar-supporting-text-color: var(--c-paper);
+  --mat-snack-bar-button-color: var(--c-primary-soft);
+}
+.mat-mdc-snack-bar-container.alert-snack {
+  --mdc-snackbar-container-color: var(--c-warn);
+  --mdc-snackbar-supporting-text-color: #fff;
+  --mat-snack-bar-button-color: #fff;
+}
+.mat-mdc-dialog-container {
+  --mdc-dialog-container-color: var(--c-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

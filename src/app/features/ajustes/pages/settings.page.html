@@ -1,0 +1,78 @@
+<div class="page narrow">
+  <h1 class="title">Ajustes</h1>
+
+  <section class="card block" aria-labelledby="s-account">
+    <h2 id="s-account">Cuenta</h2>
+    <dl class="kv">
+      <div><dt>Correo</dt><dd>{{ auth.account()?.email }}</dd></div>
+      <div><dt>Moneda</dt><dd>{{ currency() }}</dd></div>
+    </dl>
+    <p class="hint">La moneda se elige al crear la cuenta y no se puede cambiar.</p>
+  </section>
+
+  <section class="card block" aria-labelledby="s-theme">
+    <h2 id="s-theme">Apariencia</h2>
+    <div class="seg" role="radiogroup" aria-label="Tema">
+      @for (t of themes; track t.key) {
+        <button type="button" role="radio" [class.on]="themeSvc.choice() === t.key" [attr.aria-checked]="themeSvc.choice() === t.key" (click)="themeSvc.set(t.key)">
+          <span class="icon" aria-hidden="true">{{ t.icon }}</span>{{ t.label }}
+        </button>
+      }
+    </div>
+  </section>
+
+  <section class="card block" aria-labelledby="s-sync">
+    <h2 id="s-sync">Sincronización</h2>
+    <dl class="kv">
+      <div>
+        <dt>Estado</dt>
+        <dd>
+          @if (sync.offline()) { Sin conexión }
+          @else if (sync.status() === 'syncing') { Sincronizando… }
+          @else if (sync.status() === 'error') { No se pudo sincronizar }
+          @else { Al día }
+        </dd>
+      </div>
+      <div><dt>Cambios por enviar</dt><dd>{{ sync.pendingCount() }}</dd></div>
+      <div>
+        <dt>Última sincronización</dt>
+        <dd>{{ sync.lastSyncedAt() ? (sync.lastSyncedAt() | date: 'd MMM, HH:mm') : 'Aún no en esta sesión' }}</dd>
+      </div>
+    </dl>
+    <button type="button" class="btn soft" (click)="syncNow()" [disabled]="sync.offline() || sync.status() === 'syncing'">
+      <span class="icon" aria-hidden="true">sync</span> Sincronizar ahora
+    </button>
+  </section>
+
+  @if (rejected().length) {
+    <section class="card block warn-card" aria-labelledby="s-rej">
+      <h2 id="s-rej">Cambios rechazados</h2>
+      <p class="hint">El servidor no aceptó estos cambios. Corrígelos o descártalos.</p>
+      <ul class="list">
+        @for (r of rejected(); track r.id) {
+          <li class="rej">
+            <div class="rej-text">
+              <strong>{{ r.label }}</strong>
+              <span class="error-text">{{ r.message }}</span>
+            </div>
+            <div class="rej-actions">
+              <button type="button" class="btn sm ghost" (click)="retry(r)">Reintentar</button>
+              <button type="button" class="btn sm ghost" (click)="discard(r)">Descartar</button>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  <section class="card block" aria-labelledby="s-session">
+    <h2 id="s-session">Sesión</h2>
+    <div class="btns">
+      <button type="button" class="btn ghost" (click)="logout(false)">
+        <span class="icon" aria-hidden="true">logout</span> Cerrar sesión
+      </button>
+      <button type="button" class="btn ghost" (click)="logout(true)">Cerrar sesión en todos los dispositivos</button>
+    </div>
+    <p class="hint">Al cerrar sesión se borran los datos de este navegador. Lo sincronizado sigue en tu cuenta.</p>
+  </section>
+</div>
