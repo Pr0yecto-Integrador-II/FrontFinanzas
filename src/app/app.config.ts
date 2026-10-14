@@ -12,6 +12,7 @@ import { provideEchartsCore } from 'ngx-echarts';
 import { Clock, SystemClock } from './core/clock';
 import { AuthService } from './core/auth.service';
 import { authInterceptor } from './core/auth.interceptor';
+import { SyncService } from './core/sync.service';
 import { ThemeService } from './core/theme.service';
 import { routes } from './app.routes';
 
@@ -27,6 +28,7 @@ export const appConfig: ApplicationConfig = {
     { provide: Clock, useExisting: SystemClock },
     provideAppInitializer(() => {
       inject(ThemeService);
+      inject(SyncService).start();
       return inject(AuthService).init();
     }),
     provideEchartsCore({ echarts: () => import('./features/graficos/echarts-setup') }),
