@@ -33,6 +33,7 @@ export class Shell implements OnInit {
     { path: '/recurrentes', label: 'Recurrentes', icon: 'event_repeat' },
     { path: '/categorias', label: 'Categorías', icon: 'category' },
     { path: '/ajustes', label: 'Ajustes', icon: 'settings' },
+    { path: '/ayuda', label: 'Ayuda', icon: 'help' },
   ];
 
   protected readonly status = computed(() => {

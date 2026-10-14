@@ -1,0 +1,108 @@
+<div class="page help">
+  <header class="hero">
+    <span class="hero-ic" aria-hidden="true"><span class="icon">menu_book</span></span>
+    <div>
+      <h1>Manual de usuario</h1>
+      <p>Todo lo que necesitas para llevar tus finanzas, explicado paso a paso. Lee solo lo que te interese.</p>
+    </div>
+  </header>
+
+  <section class="quick" aria-labelledby="h-quick">
+    <h2 id="h-quick">Empieza en 3 pasos</h2>
+    <ol class="quick-list">
+      @for (q of quick; track q.title; let i = $index) {
+        <li class="card q">
+          <span class="q-ic"><span class="icon" aria-hidden="true">{{ q.icon }}</span></span>
+          <div>
+            <strong><span class="q-n">{{ i + 1 }}.</span> {{ q.title }}</strong>
+            <p class="muted">{{ q.text }}</p>
+          </div>
+        </li>
+      }
+    </ol>
+  </section>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contenido del manual">
+      <p class="toc-title">En esta página</p>
+      <ul>
+        @for (s of sections; track s.id) {
+          <li>
+            <button type="button" class="toc-link" (click)="go(s.id)">
+              <span class="icon" aria-hidden="true">{{ s.icon }}</span>
+              {{ s.title }}
+            </button>
+          </li>
+        }
+        <li>
+          <button type="button" class="toc-link" (click)="go('preguntas')">
+            <span class="icon" aria-hidden="true">help</span>
+            Preguntas frecuentes
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="content">
+      @for (s of sections; track s.id) {
+        <section class="card sec" [id]="s.id" [attr.aria-labelledby]="s.id + '-h'">
+          <div class="sec-head">
+            <span class="sec-ic"><span class="icon" aria-hidden="true">{{ s.icon }}</span></span>
+            <h2 [id]="s.id + '-h'">{{ s.title }}</h2>
+          </div>
+          <p class="intro">{{ s.intro }}</p>
+
+          @if (s.steps; as steps) {
+            <ol class="steps">
+              @for (st of steps; track st.title) {
+                <li>
+                  <span class="dot" aria-hidden="true"></span>
+                  <div>
+                    <strong>{{ st.title }}</strong>
+                    <p>{{ st.text }}</p>
+                  </div>
+                </li>
+              }
+            </ol>
+          }
+
+          @if (s.tips; as tips) {
+            <div class="tip" role="note">
+              <span class="icon" aria-hidden="true">lightbulb</span>
+              <ul>
+                @for (t of tips; track t) {
+                  <li>{{ t }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (s.link; as l) {
+            <a class="btn soft sec-link" [routerLink]="l.path">
+              {{ l.label }}
+              <span class="icon" aria-hidden="true">arrow_forward</span>
+            </a>
+          }
+        </section>
+      }
+
+      <section class="card sec" id="preguntas" aria-labelledby="preguntas-h">
+        <div class="sec-head">
+          <span class="sec-ic"><span class="icon" aria-hidden="true">help</span></span>
+          <h2 id="preguntas-h">Preguntas frecuentes</h2>
+        </div>
+        <div class="faqs">
+          @for (f of faqs; track f.q) {
+            <details class="faq">
+              <summary>
+                {{ f.q }}
+                <span class="icon chev" aria-hidden="true">expand_more</span>
+              </summary>
+              <p>{{ f.a }}</p>
+            </details>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

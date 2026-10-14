@@ -71,5 +71,6 @@ export class MorePage {
     { path: '/recurrentes', icon: 'event_repeat', label: 'Recurrentes', hint: 'Pagos e ingresos que se repiten' },
     { path: '/categorias', icon: 'category', label: 'Categorías', hint: 'Crea, edita y elimina las tuyas' },
     { path: '/ajustes', icon: 'settings', label: 'Ajustes', hint: 'Cuenta, tema, sincronización y sesión' },
+    { path: '/ayuda', icon: 'menu_book', label: 'Manual de usuario', hint: 'Aprende a usar la app paso a paso' },
   ];
 }
