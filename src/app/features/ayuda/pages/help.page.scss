@@ -1,0 +1,275 @@
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--r-lg);
+  background: var(--c-hero);
+  color: var(--c-on-hero);
+}
+.hero p {
+  color: var(--c-on-hero-muted);
+  margin-top: 6px;
+  max-width: 56ch;
+}
+.hero-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 12%);
+}
+.hero-ic .icon {
+  font-size: 30px;
+}
+
+.quick h2 {
+  margin-bottom: 12px;
+}
+.quick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.q {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.q-ic,
+.sec-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+.q-n {
+  font-family: var(--font-display);
+  color: var(--c-primary);
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+}
+
+/* Índice: tira horizontal en móvil, columna fija en escritorio */
+.toc {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-inline: -16px;
+  padding: 8px 16px;
+  background: var(--c-paper);
+  border-bottom: 1px solid var(--c-line);
+}
+.toc-title {
+  display: none;
+}
+.toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.toc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-surface);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.toc-link .icon {
+  font-size: 20px;
+  color: var(--c-primary);
+}
+.toc-link:hover {
+  background: var(--c-primary-soft);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.sec {
+  scroll-margin-top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.intro {
+  color: var(--c-muted);
+  font-size: 1.05rem;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.steps li {
+  display: flex;
+  gap: 14px;
+  counter-increment: step;
+}
+.steps .dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.steps .dot::before {
+  content: counter(step);
+}
+.steps p {
+  color: var(--c-muted);
+  margin-top: 2px;
+}
+
+.tip {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: var(--c-warn-soft);
+}
+.tip > .icon {
+  color: var(--c-warn);
+}
+.tip ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tip ul:only-child {
+  padding-left: 0;
+}
+.tip li::marker {
+  color: var(--c-warn);
+}
+
+.sec-link {
+  align-self: flex-start;
+}
+
+.faqs {
+  display: flex;
+  flex-direction: column;
+}
+.faq + .faq {
+  border-top: 1px solid var(--c-line);
+}
+.faq summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq .chev {
+  color: var(--c-muted);
+  transition: transform 0.2s ease;
+}
+.faq[open] .chev {
+  transform: rotate(180deg);
+}
+.faq p {
+  color: var(--c-muted);
+  padding-bottom: 12px;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .toc {
+    top: 16px;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .toc-title {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+  .toc ul {
+    flex-direction: column;
+    overflow: visible;
+    gap: 2px;
+  }
+  .toc-link {
+    width: 100%;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    white-space: normal;
+    text-align: left;
+    padding: 6px 10px;
+  }
+  .quick-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .sec {
+    scroll-margin-top: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq .chev {
+    transition: none;
+  }
+}

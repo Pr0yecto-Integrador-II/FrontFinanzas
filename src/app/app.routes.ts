@@ -82,6 +82,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/ajustes/pages/more.page').then((m) => m.MorePage),
       },
       {
+        path: 'ayuda',
+        title: 'Manual de usuario · Finanzas',
+        loadComponent: () => import('./features/ayuda/pages/help.page').then((m) => m.HelpPage),
+      },
+      {
         path: 'ajustes',
         title: 'Ajustes · Finanzas',
         loadComponent: () => import('./features/ajustes/pages/settings.page').then((m) => m.SettingsPage),
