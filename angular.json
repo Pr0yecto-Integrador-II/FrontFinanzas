@@ -26,6 +26,9 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": [
+              "microsoft-cognitiveservices-speech-sdk/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"
+            ],
             "inlineStyleLanguage": "scss",
             "assets": [
               {

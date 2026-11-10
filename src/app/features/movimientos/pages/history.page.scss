@@ -1,3 +1,26 @@
+/* Voz (HU19): acciones del encabezado, fila en lectura y aviso de bloque siguiente */
+.head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+li.reading {
+  border-radius: 14px;
+  background: var(--c-primary-soft);
+  box-shadow: inset 4px 0 0 var(--c-primary);
+  transition: background 0.2s ease;
+}
+.next-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.next-block span:nth-child(2) {
+  flex: 1;
+}
+
 .searchbar {
   display: flex;
   gap: 8px;

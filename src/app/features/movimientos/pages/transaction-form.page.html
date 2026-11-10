@@ -30,6 +30,43 @@
       </div>
     }
 
+    <section class="voice" aria-label="Voz">
+      @if (!isEdit()) {
+        <button
+          type="button"
+          class="btn soft voice-btn"
+          [class.live]="dictation() === 'listening'"
+          [class.off]="offline()"
+          [attr.aria-pressed]="dictation() === 'listening'"
+          aria-describedby="voice-state"
+          (click)="dictate()"
+        >
+          <span class="icon" aria-hidden="true">{{ dictation() === 'listening' ? 'stop_circle' : 'mic' }}</span>
+          {{ dictation() === 'listening' ? 'Detener dictado' : 'Dictar movimiento' }}
+        </button>
+        <span id="voice-state" class="voice-state" [class.live]="dictation() !== 'idle'" aria-live="polite">
+          {{ dictationLabel() }}
+        </span>
+      } @else if (existing()) {
+        <button
+          type="button"
+          class="btn soft voice-btn"
+          [class.live]="reading()"
+          [class.off]="offline()"
+          [attr.aria-pressed]="reading()"
+          (click)="toggleListen()"
+        >
+          <span class="icon" aria-hidden="true">{{ reading() ? 'stop_circle' : 'volume_up' }}</span>
+          {{ reading() ? 'Detener lectura' : 'Escuchar movimiento' }}
+        </button>
+      }
+    </section>
+    <p class="voice-msg" role="status" aria-live="polite">
+      @if (voiceMessage(); as m) {
+        <span class="icon" aria-hidden="true">{{ m.startsWith('Revisa') ? 'fact_check' : 'info' }}</span>{{ m }}
+      }
+    </p>
+
     <form (ngSubmit)="save()" [formGroup]="form" novalidate class="form">
       <div class="seg" role="group" aria-label="Tipo de movimiento">
         <button

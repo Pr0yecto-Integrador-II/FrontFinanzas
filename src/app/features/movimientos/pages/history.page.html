@@ -1,10 +1,31 @@
 <div class="page">
   <div class="page-head">
     <h1>Movimientos</h1>
-    <a class="btn sm" routerLink="/movimientos/nuevo">
-      <span class="icon" aria-hidden="true">add</span> Nuevo
-    </a>
+    <div class="head-actions">
+      @if (filtered().length) {
+        <button
+          type="button"
+          class="btn soft sm"
+          [attr.aria-pressed]="readingHistory()"
+          (click)="listenHistory()"
+        >
+          <span class="icon" aria-hidden="true">{{ readingHistory() ? 'stop_circle' : 'volume_up' }}</span>
+          {{ readingHistory() ? 'Detener lectura' : 'Escuchar historial' }}
+        </button>
+      }
+      <a class="btn sm" routerLink="/movimientos/nuevo">
+        <span class="icon" aria-hidden="true">add</span> Nuevo
+      </a>
+    </div>
   </div>
+
+  @if (nextBlock(); as nb) {
+    <div class="banner info next-block" role="status">
+      <span class="icon" aria-hidden="true">playlist_play</span>
+      <span>Quedan {{ nb.remaining }} {{ nb.remaining === 1 ? 'movimiento' : 'movimientos' }} por escuchar.</span>
+      <button type="button" class="btn text sm" (click)="listenHistory(nb.offset)">Escuchar los siguientes</button>
+    </div>
+  }
 
   <div class="searchbar">
     <label class="search">
@@ -140,7 +161,9 @@
       </header>
       <ul class="list card">
         @for (t of g.items; track t.id) {
-          <li><app-tx-row [tx]="t" [category]="catOf(t.categoryId)" (open)="open($event)" /></li>
+          <li [class.reading]="readingId() === t.id" [attr.aria-current]="readingId() === t.id ? 'true' : null">
+            <app-tx-row [tx]="t" [category]="catOf(t.categoryId)" (open)="open($event)" />
+          </li>
         }
       </ul>
     </section>
@@ -155,6 +178,8 @@
       </app-empty-state>
     }
   }
+
+  <app-voice-player-bar />
 
   <div #sentinel class="sentinel" aria-hidden="true"></div>
   @if (hasMore()) {
