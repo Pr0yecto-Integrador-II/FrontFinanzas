@@ -50,6 +50,14 @@ export class SpeechSynthesisService {
     return this.play([{ id, text }], 'single');
   }
 
+  /**
+   * Dice un texto suelto (asistente de voz, HU20) y espera a que termine o se corte.
+   * Usa el modo `single` sin id, así las pantallas de HU18/HU19 no lo confunden con su lectura.
+   */
+  announce(text: string): Promise<void> {
+    return this.play([{ id: null, text }], 'single');
+  }
+
   /** Lee una secuencia de movimientos y anuncios (HU19). */
   playQueue(items: SpeechQueueItem[]): Promise<void> {
     return this.play(items, 'queue');

@@ -1,0 +1,48 @@
+<div class="assistant" role="region" aria-label="Asistente de voz">
+  @if (hasCard()) {
+    <div class="card" role="status" aria-live="polite">
+      <button
+        type="button"
+        class="close"
+        aria-label="Cerrar"
+        [disabled]="assistant.busy()"
+        (click)="assistant.dismiss()"
+      >
+        <span class="icon" aria-hidden="true">close</span>
+      </button>
+      @if (assistant.transcript()) {
+        <p class="heard"><span class="tag">Dijiste</span>{{ assistant.transcript() }}</p>
+      }
+      @if (assistant.reply()) {
+        <p class="said"><span class="tag">Asistente</span>{{ assistant.reply() }}</p>
+      }
+      @if (assistant.error()) {
+        <p class="err">{{ assistant.error() }}</p>
+      }
+      @if (assistant.awaitingAnswer()) {
+        <!-- Respaldo táctil de la confirmación hablada: hace lo mismo que decir «sí» o «no» -->
+        <div class="answer" role="group" aria-label="Responder la confirmación">
+          <button type="button" class="yes" (click)="assistant.answer(true)">Sí, guardar</button>
+          <button type="button" class="no" (click)="assistant.answer(false)">No</button>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="row">
+    @if (assistant.busy()) {
+      <span class="pill" [attr.data-phase]="assistant.phase()">{{ assistant.status() }}</span>
+    }
+    <button
+      type="button"
+      class="mic"
+      [attr.data-phase]="assistant.phase()"
+      [disabled]="offline() && !assistant.busy()"
+      [attr.aria-label]="label()"
+      [title]="label() + ' (Alt+V)'"
+      (click)="toggle()"
+    >
+      <span class="icon" aria-hidden="true">{{ icon() }}</span>
+    </button>
+  </div>
+</div>

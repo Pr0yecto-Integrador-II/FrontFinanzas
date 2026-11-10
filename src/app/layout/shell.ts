@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@a
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { SyncService } from '../core/sync.service';
+import { AssistantFab } from '../features/asistente/components/assistant-fab';
 import { RuleRepo } from '../features/recurrentes/data/rule.repo';
 
 interface NavItem {
@@ -14,7 +15,7 @@ interface NavItem {
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AssistantFab],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
 })
@@ -39,12 +40,14 @@ export class Shell implements OnInit {
   protected readonly status = computed(() => {
     if (this.sync.offline()) return { text: 'Sin conexión', tone: 'off', icon: 'cloud_off' };
     const n = this.sync.pendingCount();
-    if (this.sync.status() === 'syncing') return { text: 'Sincronizando…', tone: 'busy', icon: 'sync' };
+    if (this.sync.status() === 'syncing')
+      return { text: 'Sincronizando…', tone: 'busy', icon: 'sync' };
     if (this.sync.rejectedCount()) {
       return { text: 'Hay cambios rechazados', tone: 'warn', icon: 'error' };
     }
     if (n) return { text: `${n} por sincronizar`, tone: 'busy', icon: 'schedule' };
-    if (this.sync.status() === 'error') return { text: 'No se pudo sincronizar', tone: 'warn', icon: 'sync_problem' };
+    if (this.sync.status() === 'error')
+      return { text: 'No se pudo sincronizar', tone: 'warn', icon: 'sync_problem' };
     return { text: 'Todo al día', tone: 'ok', icon: 'cloud_done' };
   });
 
