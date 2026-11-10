@@ -3,7 +3,7 @@
  * Sin Angular, Dexie ni SDK: recibe todo por parámetro (fechas ISO desde el Clock).
  */
 import { addDays, longDate, parseIso } from '../../../core/dates';
-import { MAX_AMOUNT_MINOR, formatMoney, parseMoney } from '../../../core/money';
+import { MAX_AMOUNT_MINOR, parseMoney } from '../../../core/money';
 import { Category, Transaction, TxType } from '../../../core/models';
 import { nameKey } from '../../categorias/domain/rules';
 import { MAX_DESCRIPTION } from './rules';
@@ -26,9 +26,115 @@ export interface VoiceDraft {
 export const OTHER_EXPENSE_NAME = 'Otros gastos';
 export const OTHER_INCOME_NAME = 'Otros ingresos';
 
-const INCOME_WORDS = ['ingreso', 'ingrese', 'recibi', 'me pagaron', 'salario', 'cobre', 'gane'];
-const EXPENSE_WORDS = ['gaste', 'pague', 'compre', 'gasto'];
-const COMMAND_WORDS = [...INCOME_WORDS, ...EXPENSE_WORDS, 'registra', 'registrar', 'anota'];
+export const INCOME_WORDS = [
+  'ingreso',
+  'ingrese',
+  'recibi',
+  'me pagaron',
+  'me depositaron',
+  'me consignaron',
+  'me transfirieron',
+  'salario',
+  'cobre',
+  'gane',
+];
+export const EXPENSE_WORDS = [
+  'gaste',
+  'pague',
+  'compre',
+  'gasto',
+  'comi',
+  'almorce',
+  'desayune',
+  'cene',
+  'recargue',
+];
+/** Verbos de orden: "agrega un gasto…", "registra…" (y "nuevo", que acompaña a gasto/ingreso). */
+export const ADD_WORDS = [
+  'agrega',
+  'agregar',
+  'agregame',
+  'anade',
+  'anadir',
+  'anademe',
+  'registra',
+  'registrar',
+  'registrame',
+  'anota',
+  'anotar',
+  'crea',
+  'crear',
+  'apunta',
+  'apuntar',
+  'guarda',
+  'guardar',
+  'agregale',
+  'anadele',
+  'ingresa',
+  'ingresar',
+  'ponme',
+  'pon',
+  'nuevo',
+  'nueva',
+];
+/** Conectores que introducen el motivo ("porque comí en…"): no son parte del concepto. */
+const CAUSAL_WORDS = ['porque', 'ya que', 'debido a', 'por concepto de'];
+const COMMAND_WORDS = [
+  ...INCOME_WORDS,
+  ...EXPENSE_WORDS,
+  ...ADD_WORDS.filter((w) => w !== 'nuevo' && w !== 'nueva'),
+  'nuevo gasto',
+  'nuevo ingreso',
+  'nueva compra',
+  ...CAUSAL_WORDS,
+];
+
+/**
+ * Palabras que delatan la categoría cuando no se nombra ("comí en…" → Alimentación).
+ * Se indexan por `nameKey` de las categorías predeterminadas; si el usuario renombró una,
+ * simplemente no aplica y se usa la última usada o «Otros».
+ */
+const CATEGORY_HINTS: Record<string, readonly string[]> = {
+  alimentacion: [
+    'comi',
+    'comida',
+    'almuerzo',
+    'almorce',
+    'desayuno',
+    'desayune',
+    'cena',
+    'cene',
+    'restaurante',
+    'mercado',
+    'supermercado',
+    'domicilio',
+    'cafe',
+    'pizza',
+    'hamburguesa',
+    'panaderia',
+  ],
+  transporte: [
+    'taxi',
+    'uber',
+    'bus',
+    'buseta',
+    'metro',
+    'transmilenio',
+    'gasolina',
+    'peaje',
+    'parqueadero',
+    'pasaje',
+    'moto',
+  ],
+  vivienda: ['arriendo', 'alquiler', 'hipoteca', 'administracion'],
+  servicios: ['luz', 'agua', 'internet', 'energia', 'celular', 'telefono', 'recarga', 'recargue'],
+  salud: ['medico', 'medicina', 'medicinas', 'droga', 'drogueria', 'farmacia', 'dentista', 'eps'],
+  educacion: ['matricula', 'curso', 'universidad', 'colegio', 'libro', 'libros', 'semestre'],
+  ocio: ['cine', 'netflix', 'spotify', 'fiesta', 'concierto', 'videojuego', 'trago', 'paseo'],
+  compras: ['ropa', 'zapatos', 'camisa', 'regalo', 'amazon', 'tienda'],
+  salario: ['sueldo', 'nomina', 'quincena'],
+  'trabajo independiente': ['freelance', 'honorarios', 'cliente', 'proyecto'],
+};
 const CURRENCY_WORDS = ['$', 'pesos', 'peso', 'cop', 'dolares', 'dolar', 'usd', 'euros', 'euro'];
 const DATE_WORDS = ['pasado manana', 'anteayer', 'manana', 'ayer', 'hoy'];
 const FILLER = new Set([
@@ -182,10 +288,32 @@ interface AmountMatch {
 function findAmount(norms: readonly string[]): AmountMatch | null {
   // 1) Cifras: "25000", "25.000", "$25.000", "1250000,50"
   for (let i = 0; i < norms.length; i++) {
-    if (/\d/.test(norms[i])) {
-      const minor = parseMoney(norms[i]);
-      if (minor !== null) return { minor, start: i, end: i + 1 };
+    if (!/\d/.test(norms[i])) continue;
+    let token = norms[i];
+    let end = i + 1;
+    let scale: string | undefined;
+    const glued = /^(\d+(?:[.,]\d+)?)(mil|millon|millones)$/.exec(norms[i]);
+    if (glued) {
+      // "50mil", "2millones": la voz a veces los transcribe pegados
+      token = glued[1];
+      scale = glued[2];
+    } else {
+      // "50 000", "1 250 000": grupos de tres cifras separados por espacio
+      if (/^\d{1,3}$/.test(norms[i]) && /^\d{3}$/.test(norms[i + 1] ?? '')) {
+        while (/^\d{3}$/.test(norms[end] ?? '')) token += norms[end++];
+      }
+      scale = norms[end];
     }
+    const minor = parseMoney(token);
+    if (minor === null) continue;
+    // "50 mil", "2 millones": la cifra se multiplica por la escala que le sigue
+    if (scale === 'mil' && minor * 1000 <= MAX_AMOUNT_MINOR) {
+      return { minor: minor * 1000, start: i, end: glued ? end : end + 1 };
+    }
+    if ((scale === 'millon' || scale === 'millones') && minor * 1_000_000 <= MAX_AMOUNT_MINOR) {
+      return { minor: minor * 1_000_000, start: i, end: glued ? end : end + 1 };
+    }
+    return { minor, start: i, end };
   }
   // 2) Monto hablado: la secuencia de palabras numéricas más larga
   let best = { start: 0, end: 0 };
@@ -223,17 +351,51 @@ function detectType(text: string): TxType {
   return 'expense'; // predeterminado de HU05 (también para "gasté", "pagué"…)
 }
 
+export interface CategoryMatch {
+  id: string | null;
+  /** `nameKey` mencionado en voz alta, para quitarlo del concepto. */
+  matched: string | null;
+}
+
+/** Posición de la primera aparición de `phrase` como palabra(s) completas; -1 si no está. */
+function phraseIndex(text: string, phrase: string): number {
+  const m = new RegExp(`(^|\\s)${escapeRegex(phrase)}(\\s|$)`).exec(text);
+  return m ? m.index + m[1].length : -1;
+}
+
+/**
+ * Categoría nombrada en el texto (ya normalizado) o, si no se nombra, la que delatan
+ * sus palabras clave. `null` si ninguna aplica.
+ */
+export function findCategoryInText(
+  text: string,
+  type: TxType,
+  categories: readonly Category[],
+): CategoryMatch | null {
+  const ofType = categories.filter((c) => c.type === type && !c.deletedAt);
+  const named = ofType
+    .filter((c) => containsPhrase(text, c.nameKey))
+    .sort((a, b) => b.nameKey.length - a.nameKey.length);
+  if (named.length) return { id: named[0].id, matched: named[0].nameKey };
+  let best: { id: string; at: number } | null = null;
+  for (const c of ofType) {
+    for (const hint of CATEGORY_HINTS[c.nameKey] ?? []) {
+      const at = phraseIndex(text, hint);
+      if (at >= 0 && (!best || at < best.at)) best = { id: c.id, at };
+    }
+  }
+  return best ? { id: best.id, matched: null } : null;
+}
+
 function pickCategory(
   text: string,
   type: TxType,
   categories: readonly Category[],
   lastUsed: string | null,
-): { id: string | null; matched: string | null } {
+): CategoryMatch {
+  const found = findCategoryInText(text, type, categories);
+  if (found) return found;
   const ofType = categories.filter((c) => c.type === type && !c.deletedAt);
-  const matches = ofType
-    .filter((c) => containsPhrase(text, c.nameKey))
-    .sort((a, b) => b.nameKey.length - a.nameKey.length);
-  if (matches.length) return { id: matches[0].id, matched: matches[0].nameKey };
   const fallbackName = type === 'expense' ? OTHER_EXPENSE_NAME : OTHER_INCOME_NAME;
   const fallback =
     ofType.find((c) => c.id === lastUsed) ??
@@ -311,6 +473,27 @@ export function parseVoiceTransactionDraft(
   };
 }
 
+/** Monto dicho solo ("cincuenta mil", "50.000"); `null` si no se entiende o no es válido. */
+export function parseSpokenAmount(transcript: string): number | null {
+  const norms = tokenize(transcript).map((t) => t.norm);
+  const amount = findAmount(norms);
+  return amount && amount.minor > 0 && amount.minor <= MAX_AMOUNT_MINOR ? amount.minor : null;
+}
+
+/** Frase normalizada (minúsculas, sin tildes ni signos) lista para comparar palabras. */
+export function speechKey(transcript: string): string {
+  return tokenize(transcript)
+    .map((t) => t.norm)
+    .join(' ');
+}
+
+/** Número entero dicho con cifras o palabras ("5", "cinco", "veinte"); `null` si no lo es. */
+export function parseSpokenInteger(word: string): number | null {
+  const w = normalizeSpeech(word);
+  if (/^\d+$/.test(w)) return Number(w);
+  return wordsToNumber([w]);
+}
+
 // ---------------------------------------------------------------------------
 // HU18 — movimiento → texto para leer en voz alta
 // ---------------------------------------------------------------------------
@@ -330,9 +513,30 @@ const MONTHS = [
   'diciembre',
 ];
 
-/** "$ 25.000" → "$25.000": la locución no necesita el espacio duro de Intl. */
+/**
+ * Monto para decirlo en voz alta, con el NOMBRE de la moneda de la cuenta:
+ * "25.000 pesos colombianos", "1 dólar estadounidense", "12 euros".
+ *
+ * No se usa el símbolo: la voz lee «$» como dólares sin importar la moneda elegida, así que
+ * un monto en pesos se oía como dólares. Intl pone el plural y el nombre de cada moneda.
+ */
 export function spokenMoney(minor: number, currency: string): string {
-  return formatMoney(minor, currency).replace(/^([^\d\u2212-]+?)[\s\u00a0\u202f]+/, '$1');
+  const abs = Math.abs(minor);
+  const hasCents = abs % 100 !== 0;
+  let text: string;
+  try {
+    text = new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'name',
+      minimumFractionDigits: hasCents ? 2 : 0,
+      maximumFractionDigits: 2,
+    }).format(abs / 100);
+  } catch {
+    // código de moneda que Intl no conoce: al menos se dice el código, nunca un símbolo
+    text = `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(abs / 100)} ${currency}`;
+  }
+  return minor < 0 ? `menos ${text}` : text;
 }
 
 function spokenDate(occurredOn: string, today: string): string {

@@ -147,12 +147,43 @@ describe('parseVoiceTransactionDraft (HU17)', () => {
 describe('formatTransactionForSpeech (HU18)', () => {
   it('lee tipo, monto, categoría, fecha relativa y concepto', () => {
     expect(formatTransactionForSpeech(tx(), 'Alimentación', 'COP', TODAY)).toBe(
-      'Gasto de $25.000 en la categoría Alimentación, registrado hoy, concepto: Almuerzo',
+      'Gasto de 25.000 pesos colombianos en la categoría Alimentación, registrado hoy, concepto: Almuerzo',
     );
   });
 
-  it('el monto se lee sin espacio duro: "$25.000"', () => {
-    expect(spokenMoney(2_500_000, 'COP')).toBe('$25.000');
+  it('el monto se dice con el NOMBRE de la moneda de la cuenta, nunca con «$»', () => {
+    expect(spokenMoney(2_500_000, 'COP')).toBe('25.000 pesos colombianos');
+    expect(spokenMoney(100, 'COP')).toBe('1 peso colombiano'); // singular
+    expect(spokenMoney(125_050, 'COP')).toBe('1.250,50 pesos colombianos'); // centavos
+    expect(spokenMoney(1_500_000_00, 'COP')).toBe('1.500.000 pesos colombianos');
+  });
+
+  it('respeta la moneda elegida en la cuenta (la voz leía «$» como dólares)', () => {
+    expect(spokenMoney(2_500_000, 'USD')).toBe('25.000 dólares estadounidenses');
+    expect(spokenMoney(1_200, 'EUR')).toBe('12 euros');
+    expect(spokenMoney(2_500_000, 'MXN')).toBe('25.000 pesos mexicanos');
+    expect(spokenMoney(2_500_000, 'PEN')).toBe('25.000 soles peruanos');
+    for (const currency of ['COP', 'USD', 'EUR', 'MXN', 'PEN']) {
+      expect(spokenMoney(2_500_000, currency)).not.toContain('$');
+    }
+  });
+
+  it('un código de moneda desconocido dice el código en vez de un símbolo', () => {
+    expect(spokenMoney(2_500_000, 'ZZZ')).toBe('25.000 ZZZ');
+  });
+
+  it('un monto negativo se dice «menos …»', () => {
+    expect(spokenMoney(-2_500_000, 'COP')).toBe('menos 25.000 pesos colombianos');
+  });
+
+  it('las frases de HU18 usan la moneda de la cuenta', () => {
+    const t = tx({ amountMinor: 2_500_000, description: null });
+    expect(formatTransactionForSpeech(t, 'Alimentación', 'COP', TODAY)).toContain(
+      'Gasto de 25.000 pesos colombianos',
+    );
+    expect(formatTransactionForSpeech(t, 'Alimentación', 'USD', TODAY)).toContain(
+      'Gasto de 25.000 dólares estadounidenses',
+    );
   });
 
   it('ingreso usa "fuente" y fecha de ayer', () => {
@@ -162,7 +193,9 @@ describe('formatTransactionForSpeech (HU18)', () => {
       'COP',
       TODAY,
     );
-    expect(text).toBe('Ingreso de $3.500.000 en la fuente Salario, registrado ayer');
+    expect(text).toBe(
+      'Ingreso de 3.500.000 pesos colombianos en la fuente Salario, registrado ayer',
+    );
   });
 
   it('sin descripción omite "concepto:"; fecha del mismo año sin año, de otro año con año', () => {
@@ -173,7 +206,7 @@ describe('formatTransactionForSpeech (HU18)', () => {
         'COP',
         TODAY,
       ),
-    ).toBe('Gasto de $25.000 en la categoría Ocio, registrado el 1 de octubre');
+    ).toBe('Gasto de 25.000 pesos colombianos en la categoría Ocio, registrado el 1 de octubre');
     expect(
       formatTransactionForSpeech(
         tx({ description: null, occurredOn: '2025-12-24' }),
