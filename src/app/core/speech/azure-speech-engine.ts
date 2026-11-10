@@ -183,9 +183,17 @@ export class AzureSpeechEngine extends SpeechEngine {
       resolveDone = resolve;
       rejectDone = reject;
     });
+    // Red de seguridad: si el navegador no avisara el fin del audio, no se queda esperando
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    let expectedMs = 0;
+    const armFallback = () => {
+      clearTimeout(fallback);
+      if (expectedMs) fallback = setTimeout(() => finish(), expectedMs + 3000);
+    };
     const finish = (error?: SpeechError) => {
       if (settled) return;
       settled = true;
+      clearTimeout(fallback);
       synthesizer?.close();
       synthesizer = null;
       if (error) rejectDone(error);
@@ -208,7 +216,16 @@ export class AzureSpeechEngine extends SpeechEngine {
           (r) => {
             if (r.reason !== sdk.ResultReason.SynthesizingAudioCompleted) {
               finish(new SpeechError('failed'));
+              return;
             }
+            // Hay que cerrar el sintetizador al terminar de generar el audio: sin eso el flujo
+            // nunca se da por terminado y el navegador JAMÁS dispara `onAudioEnd`. La app se
+            // quedaba en «Hablando…» y nunca abría el micrófono para oír el «sí» (la reproducción
+            // ya recibida sigue sonando hasta el final).
+            synthesizer?.close();
+            synthesizer = null;
+            expectedMs = r.audioDuration / 10_000; // el SDK la da en ticks de 100 ns
+            armFallback();
           },
           () => finish(new SpeechError('failed')),
         );
@@ -218,8 +235,14 @@ export class AzureSpeechEngine extends SpeechEngine {
 
     return {
       done,
-      pause: () => player?.pause(),
-      resume: () => player?.resume(),
+      pause: () => {
+        clearTimeout(fallback); // en pausa no corre el reloj de seguridad
+        player?.pause();
+      },
+      resume: () => {
+        player?.resume();
+        armFallback();
+      },
       cancel: () => {
         player?.pause();
         player?.close();
