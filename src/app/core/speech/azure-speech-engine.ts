@@ -9,6 +9,7 @@ import {
 
 // Solo tipos: el código del SDK llega por el bundle de navegador (ver `load`).
 type Sdk = typeof import('microsoft-cognitiveservices-speech-sdk');
+type SdkRecognizer = import('microsoft-cognitiveservices-speech-sdk').SpeechRecognizer;
 
 /**
  * Adaptador de `microsoft-cognitiveservices-speech-sdk` (Azure AI Speech).
@@ -49,14 +50,74 @@ export class AzureSpeechEngine extends SpeechEngine {
     }
   }
 
-  recognize(credentials: SpeechCredentials, locale: string): RecognitionHandle {
-    let recognizer: import('microsoft-cognitiveservices-speech-sdk').SpeechRecognizer | null = null;
+  /** Reconocedor ya creado y con la conexión abierta, a la espera de `recognize`. */
+  private warm: { recognizer: SdkRecognizer; at: number } | null = null;
+  private warmId = 0;
+
+  /** Crea un reconocedor con el idioma, los tiempos de silencio y las palabras esperadas. */
+  private build(
+    sdk: Sdk,
+    credentials: SpeechCredentials,
+    locale: string,
+    hints: readonly string[],
+  ): SdkRecognizer {
+    const config = sdk.SpeechConfig.fromAuthorizationToken(credentials.token, credentials.region);
+    config.speechRecognitionLanguage = locale;
+    // Una pausa para pensar a mitad de frase no debe cortar el dictado…
+    config.setProperty(sdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, '1500');
+    // …y se da tiempo a empezar a hablar tras el aviso sonoro.
+    config.setProperty(sdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, '8000');
+    const recognizer = new sdk.SpeechRecognizer(
+      config,
+      sdk.AudioConfig.fromDefaultMicrophoneInput(),
+    );
+    if (hints.length) sdk.PhraseListGrammar.fromRecognizer(recognizer).addPhrases([...hints]);
+    return recognizer;
+  }
+
+  /**
+   * Adelanta la parte lenta (crear el reconocedor y abrir la conexión) mientras el asistente
+   * todavía está hablando. Así, al terminar la pregunta, el micrófono se abre casi al instante
+   * y un «sí» dicho de inmediato no se pierde. El micrófono no se toca hasta `recognize`.
+   */
+  override prepare(
+    credentials: SpeechCredentials,
+    locale: string,
+    hints: readonly string[] = [],
+  ): void {
+    this.discard();
+    const id = this.warmId;
+    this.load()
+      .then((sdk) => {
+        if (id !== this.warmId) return; // llegó tarde: ya se descartó o se pidió otro
+        const recognizer = this.build(sdk, credentials, locale, hints);
+        this.warm = { recognizer, at: Date.now() };
+        sdk.Connection.fromRecognizer(recognizer).openConnection();
+      })
+      .catch(() => undefined); // si falla, `recognize` lo crea como siempre
+  }
+
+  override discard(): void {
+    this.warmId++;
+    this.warm?.recognizer.close();
+    this.warm = null;
+  }
+
+  recognize(
+    credentials: SpeechCredentials,
+    locale: string,
+    hints: readonly string[] = [],
+  ): RecognitionHandle {
+    let recognizer: SdkRecognizer | null = null;
     let settled = false;
     let rejectResult: (e: unknown) => void = () => undefined;
+    let markReady: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => (markReady = resolve));
 
     const close = () => {
       recognizer?.close();
       recognizer = null;
+      markReady(); // nunca deja a nadie esperando un micrófono que ya no va a abrir
     };
 
     const result = new Promise<string | null>((resolve, reject) => {
@@ -64,15 +125,16 @@ export class AzureSpeechEngine extends SpeechEngine {
       this.load().then(
         (sdk) => {
           if (settled) return;
-          const config = sdk.SpeechConfig.fromAuthorizationToken(
-            credentials.token,
-            credentials.region,
-          );
-          config.speechRecognitionLanguage = locale;
-          recognizer = new sdk.SpeechRecognizer(
-            config,
-            sdk.AudioConfig.fromDefaultMicrophoneInput(),
-          );
+          // Usa el reconocedor adelantado si es reciente; si no, uno nuevo
+          const warm = this.warm;
+          this.warm = null;
+          this.warmId++;
+          if (warm && Date.now() - warm.at < 30_000) recognizer = warm.recognizer;
+          else {
+            warm?.recognizer.close();
+            recognizer = this.build(sdk, credentials, locale, hints);
+          }
+          recognizer.sessionStarted = () => markReady();
           recognizer.recognizeOnceAsync(
             (r) => {
               settled = true;
@@ -98,6 +160,7 @@ export class AzureSpeechEngine extends SpeechEngine {
 
     return {
       result,
+      ready,
       cancel: () => {
         if (settled) return;
         settled = true;

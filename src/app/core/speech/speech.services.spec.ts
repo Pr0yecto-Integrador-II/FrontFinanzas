@@ -40,20 +40,36 @@ interface FakePlayback extends PlaybackHandle {
 /** Motor de voz falso: nada de SDK, micrófono ni red. */
 class FakeEngine extends SpeechEngine {
   micAllowed = true;
-  recognitions: { locale: string; resolve: (t: string | null) => void }[] = [];
+  recognitions: {
+    locale: string;
+    hints?: readonly string[];
+    resolve: (t: string | null) => void;
+  }[] = [];
   playbacks: FakePlayback[] = [];
+  /** Si es `true`, el micrófono tarda en abrirse: `markReady()` lo abre. */
+  holdReady = false;
+  markReady: () => void = () => undefined;
 
   async requestMicrophone(): Promise<boolean> {
     return this.micAllowed;
   }
 
-  recognize(_c: SpeechCredentials, locale: string): RecognitionHandle {
+  recognize(_c: SpeechCredentials, locale: string, hints?: readonly string[]): RecognitionHandle {
     let reject: (e: unknown) => void = () => undefined;
     const result = new Promise<string | null>((res, rej) => {
-      this.recognitions.push({ locale, resolve: res });
+      this.recognitions.push({ locale, hints, resolve: res });
       reject = rej;
     });
-    return { result, cancel: () => reject(new SpeechError('cancelled')) };
+    let ready: Promise<void> | undefined;
+    if (this.holdReady) ready = new Promise<void>((res) => (this.markReady = res));
+    return {
+      result,
+      ready,
+      cancel: () => {
+        this.markReady();
+        reject(new SpeechError('cancelled'));
+      },
+    };
   }
 
   speak(_c: SpeechCredentials, text: string, voice: string): PlaybackHandle {
@@ -181,6 +197,39 @@ describe('servicios de voz (HU16–HU19)', () => {
   });
 
   describe('SpeechRecognitionService (HU17)', () => {
+    it('«Escuchando» solo cuando el micrófono ya captura (antes se perdía el inicio de la frase)', async () => {
+      engine.holdReady = true;
+      const rec = TestBed.inject(SpeechRecognitionService);
+      const p = rec.listen();
+      await flush();
+      expect(engine.recognitions).toHaveLength(1);
+      expect(rec.state()).toBe('processing'); // preparando el micrófono: aún no hablar
+      engine.markReady();
+      await flush();
+      expect(rec.state()).toBe('listening');
+      engine.recognitions[0].resolve('Léeme el último gasto');
+      expect(await p).toBe('Léeme el último gasto');
+    });
+
+    it('cancelar mientras se prepara el micrófono lo libera sin quedar colgado', async () => {
+      engine.holdReady = true;
+      const rec = TestBed.inject(SpeechRecognitionService);
+      const p = rec.listen();
+      await flush();
+      rec.cancel();
+      expect(await p).toBeNull();
+      expect(rec.state()).toBe('idle');
+    });
+
+    it('pasa al motor las palabras que se esperan oír', async () => {
+      const rec = TestBed.inject(SpeechRecognitionService);
+      const p = rec.listen(['léeme', 'gastos', 'Alimentación']);
+      await flush();
+      expect(engine.recognitions[0].hints).toEqual(['léeme', 'gastos', 'Alimentación']);
+      engine.recognitions[0].resolve('ok');
+      await p;
+    });
+
     it('escucha en es-CO y devuelve la transcripción', async () => {
       const rec = TestBed.inject(SpeechRecognitionService);
       const p = rec.listen();

@@ -3,6 +3,7 @@ import { SyncService } from '../sync.service';
 import { SpeechAuthService } from './speech-auth.service';
 import { SPEECH_LOCALE, RecognitionHandle, SpeechEngine } from './speech-engine';
 import { SpeechError } from './speech-errors';
+import { playReadyTone } from './ready-tone';
 
 export type DictationState = 'idle' | 'processing' | 'listening';
 
@@ -26,7 +27,7 @@ export class SpeechRecognitionService {
    * Escucha una frase y devuelve la transcripción, o `null` si se canceló.
    * Lanza `SpeechError` con el motivo (sin conexión, micrófono denegado, sin coincidencias…).
    */
-  async listen(): Promise<string | null> {
+  async listen(hints?: readonly string[]): Promise<string | null> {
     if (this._state() !== 'idle') {
       this.cancel();
       return null;
@@ -46,8 +47,15 @@ export class SpeechRecognitionService {
       if (this.stopping) return null;
       if (!(await this.engine.requestMicrophone())) throw new SpeechError('mic_denied');
       if (this.stopping) return null;
-      this._state.set('listening');
-      this.handle = this.engine.recognize(credentials, SPEECH_LOCALE);
+      this.handle = this.engine.recognize(credentials, SPEECH_LOCALE, hints);
+      void this.handle.result.catch(() => undefined); // se espera más abajo; evita falsos «sin manejar»
+      // «Escuchando» solo cuando el micrófono ya captura: antes, lo dicho se perdía
+      await this.handle.ready;
+      if (this.stopping) this.handle.cancel();
+      else {
+        this._state.set('listening');
+        playReadyTone();
+      }
       const text = await this.handle.result;
       this._state.set('processing');
       if (!text?.trim()) throw new SpeechError('no_match');
@@ -63,9 +71,23 @@ export class SpeechRecognitionService {
     }
   }
 
+  /**
+   * Adelanta la conexión mientras el asistente todavía habla, para que la siguiente escucha
+   * empiece casi al instante (una respuesta corta dicha de inmediato, como «sí», no se pierda).
+   * Sin conexión o ante cualquier fallo no hace nada: `listen` funciona igual, solo tarda más.
+   */
+  prepare(hints?: readonly string[]): void {
+    if (!this.sync.online()) return;
+    this.auth.credentials().then(
+      (credentials) => this.engine.prepare(credentials, SPEECH_LOCALE, hints),
+      () => undefined,
+    );
+  }
+
   /** Detiene la escucha y libera el micrófono. */
   cancel(): void {
     this.stopping = true;
     this.handle?.cancel();
+    this.engine.discard();
   }
 }
