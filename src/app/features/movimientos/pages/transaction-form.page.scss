@@ -19,6 +19,52 @@
   color: var(--c-expense);
 }
 
+/* Voz (MVP 2): dictado y lectura */
+.voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.voice-btn.live {
+  background: var(--c-expense-soft);
+  color: var(--c-expense);
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+.voice-btn.off {
+  opacity: 0.7;
+}
+.voice-state {
+  color: var(--c-muted);
+  font-size: 0.875rem;
+}
+.voice-state.live {
+  color: var(--c-primary);
+  font-weight: 600;
+}
+.voice-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.25rem;
+  margin: 6px 0 12px;
+  color: var(--c-muted);
+  font-size: 0.875rem;
+}
+.voice-msg .icon {
+  font-size: 18px;
+}
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--c-expense) 18%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-btn.live {
+    animation: none;
+  }
+}
+
 .form {
   display: flex;
   flex-direction: column;

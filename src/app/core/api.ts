@@ -36,6 +36,13 @@ export interface PullResponse {
   has_more: boolean;
 }
 
+/** Token temporal de Azure AI Speech (MVP 2, HU16). Nunca incluye la clave de suscripción. */
+export interface SpeechTokenResponse {
+  token: string;
+  region: string;
+  expires_in_seconds: number;
+}
+
 /** Error normalizado de la API. `status` 0 = sin conexión con el servidor. */
 export class ApiError extends Error {
   constructor(
@@ -59,9 +66,14 @@ export function toApiError(e: unknown): ApiError {
     }
     const body = e.error as { code?: string; message?: string; detail?: unknown } | null;
     if (body?.code && body.message) return new ApiError(e.status, body.code, body.message);
-    if (e.status === 422) return new ApiError(422, 'ValidationError', 'Revisa los datos ingresados.');
+    if (e.status === 422)
+      return new ApiError(422, 'ValidationError', 'Revisa los datos ingresados.');
     if (e.status === 429) {
-      return new ApiError(429, 'TooManyRequestsError', 'Demasiados intentos. Intenta de nuevo en 15 minutos');
+      return new ApiError(
+        429,
+        'TooManyRequestsError',
+        'Demasiados intentos. Intenta de nuevo en 15 minutos',
+      );
     }
     return new ApiError(e.status, 'ServerError', 'Algo salió mal. Intenta de nuevo.');
   }
@@ -90,7 +102,9 @@ export class Api {
   }): Promise<SessionResponse> {
     return this.call(
       firstValueFrom(
-        this.http.post<SessionResponse>(`${this.base}/auth/register`, body, { withCredentials: true }),
+        this.http.post<SessionResponse>(`${this.base}/auth/register`, body, {
+          withCredentials: true,
+        }),
       ),
     );
   }
@@ -106,7 +120,9 @@ export class Api {
   refresh(): Promise<SessionResponse> {
     return this.call(
       firstValueFrom(
-        this.http.post<SessionResponse>(`${this.base}/auth/refresh`, null, { withCredentials: true }),
+        this.http.post<SessionResponse>(`${this.base}/auth/refresh`, null, {
+          withCredentials: true,
+        }),
       ),
     );
   }
@@ -123,7 +139,9 @@ export class Api {
 
   forgotPassword(email: string): Promise<{ message: string }> {
     return this.call(
-      firstValueFrom(this.http.post<{ message: string }>(`${this.base}/auth/password/forgot`, { email })),
+      firstValueFrom(
+        this.http.post<{ message: string }>(`${this.base}/auth/password/forgot`, { email }),
+      ),
     );
   }
 
@@ -142,7 +160,15 @@ export class Api {
   }
 
   push(changes: PushChange[]): Promise<PushResponse> {
-    return this.call(firstValueFrom(this.http.post<PushResponse>(`${this.base}/sync/push`, { changes })));
+    return this.call(
+      firstValueFrom(this.http.post<PushResponse>(`${this.base}/sync/push`, { changes })),
+    );
+  }
+
+  speechToken(): Promise<SpeechTokenResponse> {
+    return this.call(
+      firstValueFrom(this.http.post<SpeechTokenResponse>(`${this.base}/speech/token`, {})),
+    );
   }
 
   pull(since: number, limit = 500): Promise<PullResponse> {

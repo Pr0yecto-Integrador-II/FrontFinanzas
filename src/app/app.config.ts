@@ -12,6 +12,8 @@ import { provideEchartsCore } from 'ngx-echarts';
 import { Clock, SystemClock } from './core/clock';
 import { AuthService } from './core/auth.service';
 import { authInterceptor } from './core/auth.interceptor';
+import { AzureSpeechEngine } from './core/speech/azure-speech-engine';
+import { SpeechEngine } from './core/speech/speech-engine';
 import { SyncService } from './core/sync.service';
 import { ThemeService } from './core/theme.service';
 import { routes } from './app.routes';
@@ -26,6 +28,7 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     { provide: Clock, useExisting: SystemClock },
+    { provide: SpeechEngine, useExisting: AzureSpeechEngine },
     provideAppInitializer(() => {
       inject(ThemeService);
       inject(SyncService).start();

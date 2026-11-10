@@ -29,6 +29,7 @@
     "@fontsource/material-symbols-rounded": "^5.3.9",
     "dexie": "^4.4.6",
     "echarts": "^6.1.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.53.0",
     "ngx-echarts": "^22.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

@@ -2,6 +2,7 @@ import { Location } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   afterNextRender,
   computed,
@@ -19,6 +20,9 @@ import { Clock } from '../../../core/clock';
 import { addDays, longDate } from '../../../core/dates';
 import { formatPlain, parseMoney } from '../../../core/money';
 import { Transaction, TxType } from '../../../core/models';
+import { SPEECH_TEXT, speechMessage } from '../../../core/speech/speech-errors';
+import { SpeechRecognitionService } from '../../../core/speech/speech-recognition.service';
+import { SpeechSynthesisService } from '../../../core/speech/speech-synthesis.service';
 import { SyncService } from '../../../core/sync.service';
 import { Dialogs } from '../../../shared/confirm-dialog';
 import { Toast } from '../../../shared/toast.service';
@@ -36,6 +40,13 @@ import {
   hasErrors,
   validateTx,
 } from '../domain/rules';
+import {
+  VoiceDraft,
+  formatTransactionForSpeech,
+  parseVoiceTransactionDraft,
+} from '../domain/voice';
+
+const DICTATION_LABEL = { idle: 'Listo', listening: 'Escuchando...', processing: 'Procesando...' };
 
 @Component({
   selector: 'app-transaction-form-page',
@@ -60,6 +71,20 @@ export class TransactionFormPage {
   private readonly toast = inject(Toast);
   private readonly dialogs = inject(Dialogs);
   private readonly fb = inject(FormBuilder).nonNullable;
+  private readonly recognition = inject(SpeechRecognitionService);
+  private readonly synthesis = inject(SpeechSynthesisService);
+
+  // --- Voz (MVP 2): dictado al crear (HU17) y lectura al consultar (HU18) ---
+  protected readonly offline = this.sync.offline;
+  protected readonly dictation = this.recognition.state;
+  protected readonly dictationLabel = computed(() => DICTATION_LABEL[this.dictation()]);
+  protected readonly voiceMessage = signal<string | null>(null);
+  protected readonly reading = computed(
+    () =>
+      this.synthesis.mode() === 'single' &&
+      this.synthesis.active() &&
+      this.synthesis.activeId() === this.existing()?.id,
+  );
 
   protected readonly today = this.clock.today();
   protected readonly yesterday = addDays(this.today, -1);
@@ -139,6 +164,12 @@ export class TransactionFormPage {
   private readonly amountInput = viewChild<ElementRef<HTMLInputElement>>('amountInput');
 
   constructor() {
+    // Salir de la pantalla libera el micrófono y corta la lectura en curso
+    inject(DestroyRef).onDestroy(() => {
+      this.recognition.cancel();
+      if (this.reading()) this.synthesis.stop();
+    });
+
     // Al crear, el cursor ya está en el monto: "+" → escribir → "Guardar"
     afterNextRender(() => {
       if (!this.id()) this.amountInput()?.nativeElement.focus();
@@ -256,7 +287,13 @@ export class TransactionFormPage {
         this.auth.currency(),
         catName,
       );
-      this.toast.show(prev ? 'Cambios guardados' : saved.type === 'income' ? 'Ingreso guardado' : 'Gasto guardado');
+      this.toast.show(
+        prev
+          ? 'Cambios guardados'
+          : saved.type === 'income'
+            ? 'Ingreso guardado'
+            : 'Gasto guardado',
+      );
       for (const a of alerts) this.toast.alert(a);
       void this.sync.sync();
       this.close();
@@ -279,13 +316,80 @@ export class TransactionFormPage {
     if (!t) return;
     const r = await this.dialogs.confirm({
       title: '¿Descartar este cambio?',
-      message: 'El movimiento vuelve a como está en el servidor, o se quita si nunca llegó a guardarse allí.',
+      message:
+        'El movimiento vuelve a como está en el servidor, o se quita si nunca llegó a guardarse allí.',
       confirmText: 'Descartar',
       danger: true,
     });
     if (r !== 'confirm') return;
     await this.sync.discardRejected('transaction', t.id);
     this.close('/movimientos');
+  }
+
+  /** HU17: escucha, interpreta y prellena. Nunca guarda sin que el usuario presione "Guardar". */
+  protected async dictate(): Promise<void> {
+    this.voiceMessage.set(null);
+    if (this.offline()) {
+      this.voiceMessage.set(SPEECH_TEXT.offlineDictation);
+      return;
+    }
+    try {
+      const transcript = await this.recognition.listen();
+      if (transcript === null) return; // el usuario detuvo la escucha
+      const draft = parseVoiceTransactionDraft(transcript, this.cats.active(), this.today, {
+        expense: this.repo.lastUsedCategory('expense'),
+        income: this.repo.lastUsedCategory('income'),
+      });
+      this.applyDraft(draft);
+    } catch (e) {
+      // Lo que ya esté en el formulario se conserva para completarlo a mano
+      this.voiceMessage.set(speechMessage(e, 'dictation'));
+    }
+  }
+
+  private applyDraft(d: VoiceDraft): void {
+    if (d.type !== this.type()) this.type.set(d.type);
+    if (d.categoryId) this.categoryId.set(d.categoryId);
+    this.form.patchValue({
+      amount: d.amountMinor !== null ? formatPlain(d.amountMinor) : '',
+      occurredOn: d.occurredOn,
+      description: d.description,
+    });
+    this.form.controls.amount.markAsDirty();
+    if (d.amountMinor === null) {
+      this.attempted.set(true); // "Guardar" queda deshabilitado hasta escribir un monto válido
+      this.voiceMessage.set(SPEECH_TEXT.noAmount);
+      this.amountInput()?.nativeElement.focus();
+      return;
+    }
+    if (d.futureDate) this.attempted.set(true);
+    this.voiceMessage.set(SPEECH_TEXT.reviewDraft);
+  }
+
+  /** HU18: "Escuchar movimiento" / "Detener lectura" con los datos guardados en el dispositivo. */
+  protected async toggleListen(): Promise<void> {
+    const t = this.existing();
+    if (!t) return;
+    if (this.reading()) {
+      this.synthesis.stop();
+      return;
+    }
+    this.voiceMessage.set(null);
+    if (this.offline()) {
+      this.voiceMessage.set(SPEECH_TEXT.offlineReading);
+      return;
+    }
+    const text = formatTransactionForSpeech(
+      t,
+      this.cats.byId().get(t.categoryId)?.name,
+      this.auth.currency(),
+      this.today,
+    );
+    try {
+      await this.synthesis.speakOne(t.id, text);
+    } catch (e) {
+      this.voiceMessage.set(speechMessage(e, 'reading'));
+    }
   }
 
   protected close(fallback = '/'): void {
