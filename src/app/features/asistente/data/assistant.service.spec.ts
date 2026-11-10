@@ -206,6 +206,32 @@ describe('AssistantService (HU20)', () => {
     await flush();
   }
 
+  /**
+   * Tras cada respuesta el asistente pregunta «¿Necesitas algo más?». Aquí termina de hablar la
+   * respuesta, oye la pregunta y el usuario dice «no»: el asistente se despide y apaga el micrófono.
+   */
+  async function endConversation(conversation: Promise<void>) {
+    await finishSpeaking(); // termina la respuesta
+    expect(lastSpoken().text).toBe('¿Necesitas algo más?');
+    await finishSpeaking(); // termina la pregunta; se abre el micrófono
+    await flush();
+    engine.recognitions[engine.recognitions.length - 1].resolve('no');
+    await flush();
+    expect(lastSpoken().text).toBe('Listo. Aquí estoy cuando me necesites');
+    await finishSpeaking();
+    await conversation;
+  }
+
+  /** Responde «¿Necesitas algo más?» con `text` y deja al asistente listo para continuar. */
+  async function answerFollowUp(text: string | null) {
+    await finishSpeaking(); // termina la respuesta anterior
+    expect(lastSpoken().text).toBe('¿Necesitas algo más?');
+    await finishSpeaking(); // se abre el micrófono
+    await flush();
+    engine.recognitions[engine.recognitions.length - 1].resolve(text);
+    await flush();
+  }
+
   it('lee los últimos gastos y no modifica nada', async () => {
     const p = assistant.activate();
     await userSays(0, 'Léeme los últimos 2 gastos');
@@ -215,8 +241,7 @@ describe('AssistantService (HU20)', () => {
         'Gasto de 50.000 pesos colombianos en la categoría Alimentación, registrado hoy, concepto: Crepes. ' +
         'Gasto de 10.000 pesos colombianos en la categoría Alimentación, registrado ayer',
     );
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
     expect(assistant.phase()).toBe('idle');
     expect(repo.save).not.toHaveBeenCalled();
     expect(repo.remove).not.toHaveBeenCalled();
@@ -246,8 +271,7 @@ describe('AssistantService (HU20)', () => {
     });
     expect(syncNow).toHaveBeenCalled();
     expect(lastSpoken().text).toBe('Listo, gasto guardado');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
     expect(assistant.phase()).toBe('idle');
   });
 
@@ -257,8 +281,7 @@ describe('AssistantService (HU20)', () => {
     expect(engine.prepared).toBeGreaterThan(0); // antes de terminar de hablar
     await finishSpeaking();
     await userSays(1, 'sí');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('mientras el micrófono se abre no dice «escuchando» (lo que se hable se perdería)', async () => {
@@ -285,8 +308,7 @@ describe('AssistantService (HU20)', () => {
     await finishSpeaking();
     await userSays(2, 'sí');
     expect(repo.save).toHaveBeenCalledTimes(1);
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('los botones de la tarjeta confirman igual que decir «sí»', async () => {
@@ -297,8 +319,7 @@ describe('AssistantService (HU20)', () => {
     await flush();
     expect(repo.save).toHaveBeenCalledTimes(1);
     expect(lastSpoken().text).toBe('Listo, gasto guardado');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
     expect(assistant.awaitingAnswer()).toBe(false);
   });
 
@@ -311,8 +332,7 @@ describe('AssistantService (HU20)', () => {
     await flush();
     expect(repo.save).not.toHaveBeenCalled();
     expect(lastSpoken().text).toBe('Cancelado, no guardé nada');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('los botones no hacen nada si no hay pregunta pendiente', async () => {
@@ -328,8 +348,7 @@ describe('AssistantService (HU20)', () => {
     await userSays(1, 'no');
     expect(repo.save).not.toHaveBeenCalled();
     expect(lastSpoken().text).toBe('Cancelado, no guardé nada');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('si no entiende el «sí/no» reintenta una vez y luego cancela sin guardar', async () => {
@@ -357,8 +376,7 @@ describe('AssistantService (HU20)', () => {
     await finishSpeaking();
     await userSays(2, 'sí');
     expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({ amountMinor: 4_000_000 }));
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('si el monto sigue sin entenderse, abre el formulario y no guarda', async () => {
@@ -377,8 +395,7 @@ describe('AssistantService (HU20)', () => {
     const p = assistant.activate();
     await userSays(0, 'agrega un gasto de 10000 mañana');
     expect(lastSpoken().text).toBe('La fecha no puede ser futura');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
     expect(repo.save).not.toHaveBeenCalled();
   });
 
@@ -390,8 +407,7 @@ describe('AssistantService (HU20)', () => {
     await userSays(1, 'sí');
     expect(repo.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }));
     expect(toast.undo).toHaveBeenCalledWith('Movimiento eliminado', expect.any(Function));
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('eliminar el último y decir «no» no borra nada', async () => {
@@ -400,8 +416,7 @@ describe('AssistantService (HU20)', () => {
     await finishSpeaking();
     await userSays(1, 'no');
     expect(repo.remove).not.toHaveBeenCalled();
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('navega a otra pantalla', async () => {
@@ -409,8 +424,7 @@ describe('AssistantService (HU20)', () => {
     await userSays(0, 've a presupuestos');
     expect(router.navigateByUrl).toHaveBeenCalledWith('/presupuestos');
     expect(lastSpoken().text).toBe('Abriendo presupuestos');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('si no entiende, dice qué escuchó y vuelve a escuchar SOLO, sin tocar el botón', async () => {
@@ -424,9 +438,8 @@ describe('AssistantService (HU20)', () => {
     await userSays(1, 'léeme el último gasto');
     expect(assistant.transcript()).toBe('léeme el último gasto');
     expect(lastSpoken().text).toMatch(/^Tu último gasto\. /);
-    await finishSpeaking();
-    await p;
-    expect(engine.recognitions).toHaveLength(2);
+    await endConversation(p);
+    expect(engine.recognitions).toHaveLength(3);
   });
 
   it('tras dos intentos fallidos da ejemplos y no insiste más', async () => {
@@ -445,17 +458,15 @@ describe('AssistantService (HU20)', () => {
     const p = assistant.activate();
     await userSays(0, 'leme los ultimos 2 gastoz');
     expect(lastSpoken().text).toMatch(/^Tus últimos 2 gastos\. /);
-    await finishSpeaking();
-    await p;
-    expect(engine.recognitions).toHaveLength(1); // a la primera
+    expect(engine.recognitions).toHaveLength(1); // la orden se entendió a la primera
+    await endConversation(p);
   });
 
   it('filtra por categoría y avisa cuántos más hay', async () => {
     const p = assistant.activate();
     await userSays(0, 'léeme el último gasto de alimentación');
     expect(lastSpoken().text).toMatch(/^Tu último gasto en Alimentación\. .*Tienes 1 más/);
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('dice los montos con la moneda de la cuenta (pesos), no como dólares', async () => {
@@ -466,8 +477,7 @@ describe('AssistantService (HU20)', () => {
     expect(lastSpoken().text).not.toMatch(/d[óo]lar/i);
     await finishSpeaking();
     await userSays(1, 'no');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('si la cuenta es en dólares, entonces sí dice dólares', async () => {
@@ -475,41 +485,36 @@ describe('AssistantService (HU20)', () => {
     const p = assistant.activate();
     await userSays(0, 'léeme el último gasto');
     expect(lastSpoken().text).toContain('50.000 dólares estadounidenses');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
   });
 
   it('responde cuántos y el mayor gasto', async () => {
     const first = assistant.activate();
     await userSays(0, '¿cuántos gastos tengo este mes?');
     expect(lastSpoken().text).toBe('Este mes tienes 2 gastos registrados');
-    await finishSpeaking();
-    await first;
+    await endConversation(first);
 
     const second = assistant.activate();
-    await userSays(1, 'cuál es mi mayor gasto');
+    await userSays(engine.recognitions.length, 'cuál es mi mayor gasto');
     expect(lastSpoken().text).toContain(
       'Tu mayor gasto este mes fue: Gasto de 50.000 pesos colombianos',
     );
-    await finishSpeaking();
-    await second;
+    await endConversation(second);
   });
 
   it('saluda y agradece en vez de decir que no entendió', async () => {
     const p = assistant.activate();
     await userSays(0, 'hola');
     expect(lastSpoken().text).toContain('Dime qué necesitas');
-    await finishSpeaking();
-    await p;
-    expect(engine.recognitions).toHaveLength(1);
+    await endConversation(p);
+    expect(engine.recognitions).toHaveLength(2);
   });
 
   it('eliminar algo que no es «el último» lo explica y no borra', async () => {
     const p = assistant.activate();
     await userSays(0, 'elimina el gasto de rappi');
     expect(lastSpoken().text).toContain('solo puedo eliminar el último movimiento');
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
     expect(repo.remove).not.toHaveBeenCalled();
   });
 
@@ -552,20 +557,127 @@ describe('AssistantService (HU20)', () => {
     await finishSpeaking();
     await userSays(1, 'léeme el último ingreso');
     expect(lastSpoken().text).toMatch(/^Tu último ingreso\. /);
-    await finishSpeaking();
-    await p;
+    await endConversation(p);
+  });
+
+  describe('«¿Necesitas algo más?»: el micrófono solo sigue abierto si el usuario quiere', () => {
+    it('al terminar una tarea pregunta si necesita algo más antes de apagar el micrófono', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await finishSpeaking(); // termina la respuesta
+      expect(lastSpoken().text).toBe('¿Necesitas algo más?');
+      expect(assistant.busy()).toBe(true); // sigue la conversación
+      await finishSpeaking();
+      await flush();
+      engine.recognitions[engine.recognitions.length - 1].resolve('no');
+      await flush();
+      expect(lastSpoken().text).toBe('Listo. Aquí estoy cuando me necesites');
+      await finishSpeaking();
+      await p;
+      expect(assistant.phase()).toBe('idle'); // micrófono apagado
+      expect(engine.recognitions).toHaveLength(2); // y no se abrió otra escucha
+    });
+
+    it('«sí» → «Te escucho» → atiende otra orden en la misma conversación, sin tocar el botón', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await answerFollowUp('sí');
+      expect(lastSpoken().text).toBe('Te escucho');
+      await finishSpeaking();
+      await userSays(engine.recognitions.length - 1, 'cuántos gastos tengo este mes');
+      expect(lastSpoken().text).toBe('Este mes tienes 2 gastos registrados');
+      await endConversation(p);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('si responde directamente con otra orden, la ejecuta sin decir «Te escucho»', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await answerFollowUp('léeme el último ingreso');
+      expect(lastSpoken().text).toMatch(/^Tu último ingreso\. /);
+      await endConversation(p);
+    });
+
+    it('«sí, léeme…» también vale como orden', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await answerFollowUp('sí, cuántos gastos tengo este mes');
+      expect(lastSpoken().text).toBe('Este mes tienes 2 gastos registrados');
+      await endConversation(p);
+    });
+
+    it.each(['gracias', 'nada más', 'no gracias', 'eso es todo', 'no', 'ya'])(
+      '«%s» → se despide y apaga el micrófono',
+      async (reply) => {
+        const p = assistant.activate();
+        await userSays(0, 'léeme el último gasto');
+        await answerFollowUp(reply);
+        expect(lastSpoken().text).toBe('Listo. Aquí estoy cuando me necesites');
+        await finishSpeaking();
+        await p;
+        expect(assistant.phase()).toBe('idle');
+      },
+    );
+
+    it('si se queda callado se despide y apaga el micrófono (no lo deja abierto)', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await answerFollowUp(null); // silencio
+      expect(lastSpoken().text).toBe('Listo. Aquí estoy cuando me necesites');
+      await finishSpeaking();
+      await p;
+      expect(assistant.phase()).toBe('idle');
+      expect(engine.recognitions).toHaveLength(2);
+    });
+
+    it('tocar el botón mientras pregunta «¿algo más?» lo apaga todo', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'léeme el último gasto');
+      await finishSpeaking();
+      expect(lastSpoken().text).toBe('¿Necesitas algo más?');
+      void assistant.activate(); // segundo toque = detener
+      await flush();
+      await p;
+      expect(assistant.phase()).toBe('idle');
+    });
+
+    it('después de guardar por voz también pregunta si necesita algo más', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'agrega un gasto de 20 mil en almuerzo');
+      await finishSpeaking();
+      await userSays(1, 'sí, correcto');
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(lastSpoken().text).toBe('Listo, gasto guardado');
+      await endConversation(p);
+    });
+
+    it('si no entiende ni la orden ni el ejemplo, termina sin preguntar «¿algo más?»', async () => {
+      const p = assistant.activate();
+      await userSays(0, 'qué buen día');
+      await finishSpeaking();
+      await userSays(1, 'el perro corre');
+      await finishSpeaking();
+      await p;
+      expect(engine.playbacks.map((x) => x.text)).not.toContain('¿Necesitas algo más?');
+    });
+  });
+
+  it('«muéstrame los presupuestos» abre la pantalla en vez de leerla', async () => {
+    const p = assistant.activate();
+    await userSays(0, 'muéstrame los presupuestos');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/presupuestos');
+    expect(lastSpoken().text).toBe('Abriendo presupuestos');
+    await endConversation(p);
   });
 
   it('«repite» vuelve a decir lo último', async () => {
     const first = assistant.activate();
     await userSays(0, 'cuánto he gastado este mes');
     const said = lastSpoken().text;
-    await finishSpeaking();
-    await first;
+    await endConversation(first);
     const second = assistant.activate();
-    await userSays(1, 'repite');
+    await userSays(engine.recognitions.length, 'repite');
     expect(lastSpoken().text).toBe(said);
-    await finishSpeaking();
-    await second;
+    await endConversation(second);
   });
 });

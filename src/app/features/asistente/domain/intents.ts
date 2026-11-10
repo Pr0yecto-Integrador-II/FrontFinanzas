@@ -117,12 +117,6 @@ alias(
   'dimelas',
   'decime',
   'cuentame',
-  'muestrame',
-  'muestra',
-  'mostrame',
-  'mostrar',
-  'ensename',
-  'ensenar',
   'repiteme',
   'informame',
   'informar',
@@ -130,12 +124,25 @@ alias(
   'escucho',
   'escuchame',
   'oir',
-  'ver',
+
   'consultar',
   'consulta',
   'revisar',
   'revisa',
   'dame',
+);
+// «Muéstrame / quiero ver»: igual que leer cuando se piden movimientos, pero con una pantalla
+// («muéstrame los presupuestos») significa ABRIRLA, no leer su resumen.
+alias(
+  'muestrame',
+  'muestra',
+  'mostrame',
+  'mostrar',
+  'ensename',
+  'ensenar',
+  'ver',
+  'veo',
+  'enseñame',
 );
 alias('ultimo', 'ultima', 'reciente', 'ultimito');
 alias('ultimos', 'ultimas', 'recientes');
@@ -210,6 +217,7 @@ const NOISE = new Set([
 
 /** Palabras que el intérprete conoce: sirven de destino para corregir errores de transcripción. */
 const VOCAB = [
+  'muestrame',
   'leeme',
   'ultimo',
   'ultimos',
@@ -576,7 +584,8 @@ export function parseCommand(transcript: string, ctx: CommandContext): Intent {
 
   const nounAny = words.some((w) => NOUN_SET.has(w));
   const asksLast = hasAny(t, ['ultimo', 'ultimos']);
-  const readVerb = has(t, 'leeme');
+  const showVerb = has(t, 'muestrame');
+  const readVerb = has(t, 'leeme') || showVerb;
   const type = detectType(t);
   const period = detectPeriod(t);
   const amount = parseSpokenAmount(transcript);
@@ -602,7 +611,15 @@ export function parseCommand(transcript: string, ctx: CommandContext): Intent {
   const dest = DESTINATIONS.find((d) => hasAny(t, d.keys));
   if (dest) {
     const justThat = words.length <= 2;
-    if (navVerb || (!dest.needsVerb && (dest.anyNoun || !nounAny) && (readVerb || justThat))) {
+    // «Muéstrame los presupuestos» abre la pantalla; con un filtro («…de alimentación»,
+    // «…de este mes», «los últimos…») ya pide datos y sigue por su consulta.
+    const plainShow =
+      showVerb && !asksLast && period === null && !categoryOf(rawKey, 'expense', ctx.categories).id;
+    if (
+      navVerb ||
+      plainShow ||
+      (!dest.needsVerb && (dest.anyNoun || !nounAny) && (readVerb || justThat))
+    ) {
       return { kind: 'navigate', route: dest.route, label: dest.label };
     }
   }

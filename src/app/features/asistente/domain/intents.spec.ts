@@ -323,8 +323,39 @@ describe('navegar, eliminar y control', () => {
     ['abre los próximos pagos', '/recurrentes/proximos'],
     ['nuevo movimiento', '/movimientos/nuevo'],
     ['abre nuevo movimiento', '/movimientos/nuevo'],
+    // «muéstrame / quiero ver» + pantalla = abrirla
+    ['muéstrame los presupuestos', '/presupuestos'],
+    ['muéstrame mis presupuestos', '/presupuestos'],
+    ['muestrame los presupuestos', '/presupuestos'],
+    ['quiero ver los presupuestos', '/presupuestos'],
+    ['quiero ver mis presupuestos', '/presupuestos'],
+    ['enséñame los presupuestos', '/presupuestos'],
+    ['muéstrame los movimientos', '/movimientos'],
+    ['muéstrame mi historial', '/movimientos'],
+    ['muéstrame los gráficos', '/graficos'],
+    ['muéstrame las categorías', '/categorias'],
+    ['muéstrame los recurrentes', '/recurrentes'],
+    ['llévame a presupuestos', '/presupuestos'],
+    ['ve a mis presupuestos', '/presupuestos'],
   ])('«%s»', (frase, route) => {
     expect(parse(frase)).toMatchObject({ kind: 'navigate', route });
+  });
+
+  it('con un filtro, «muéstrame…» sigue siendo una consulta y no abre la pantalla', () => {
+    expect(parse('muéstrame el presupuesto de alimentación')).toMatchObject({
+      kind: 'query_budget',
+      categoryId: 'ali',
+    });
+    expect(parse('muéstrame los presupuestos de este mes').kind).toBe('query_budget');
+    expect(parse('léeme los presupuestos')).toMatchObject({
+      kind: 'query_budget',
+      categoryId: null,
+    });
+    expect(parse('muéstrame los últimos 5 gastos')).toMatchObject({
+      kind: 'read_recent',
+      count: 5,
+    });
+    expect(parse('muéstrame mis gastos de transporte').kind).toBe('read_recent');
   });
 
   it.each([

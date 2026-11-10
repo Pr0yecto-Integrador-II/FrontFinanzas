@@ -30,6 +30,10 @@ export const ASSISTANT_TEXT = {
   greeting:
     'Hola. Dime qué necesitas. Por ejemplo: léeme los últimos 5 gastos, o agrega un gasto de 50 mil',
   thanks: 'Con gusto',
+  /** Al terminar cada tarea: decide si el micrófono sigue encendido o se apaga. */
+  anythingElse: '¿Necesitas algo más?',
+  listening: 'Te escucho',
+  bye: 'Listo. Aquí estoy cuando me necesites',
   deleteHelp:
     'Por ahora solo puedo eliminar el último movimiento. Di, por ejemplo: elimina el último gasto',
   /** Se oyó algo, pero no era «sí» ni «no». */

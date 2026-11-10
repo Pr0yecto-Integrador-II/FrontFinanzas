@@ -137,22 +137,72 @@ export class AssistantService {
    * tras el segundo intento fallido da ejemplos.
    */
   private async turn(run: number): Promise<void> {
-    let heard = await this.listenCommand(run);
-    if (heard === null) return;
-    this._transcript.set(heard);
-    let intent: Intent = heard ? parseCommand(heard, this.context()) : { kind: 'unknown' };
-
-    if (intent.kind === 'unknown') {
-      const retry = heard ? ASSISTANT_TEXT.notUnderstood(heard) : ASSISTANT_TEXT.silence;
-      if (!(await this.say(run, retry))) return;
-      heard = await this.listenCommand(run);
+    // Conversación: orden → respuesta → «¿necesitas algo más?». El micrófono solo se abre
+    // mientras se espera una respuesta, y se apaga cuando el usuario dice que no, se despide
+    // o se queda callado.
+    let carried: string | null = null; // frase ya oída como respuesta al «¿algo más?»
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      let heard = carried ?? (await this.listenCommand(run));
       if (heard === null) return;
       this._transcript.set(heard);
-      intent = heard ? parseCommand(heard, this.context()) : { kind: 'unknown' };
-    }
+      let intent: Intent = heard ? parseCommand(heard, this.context()) : { kind: 'unknown' };
 
-    this._phase.set('thinking');
-    await this.handle(run, intent);
+      if (intent.kind === 'unknown') {
+        const retry = heard ? ASSISTANT_TEXT.notUnderstood(heard) : ASSISTANT_TEXT.silence;
+        this.recognition.prepare(this.commandHints());
+        if (!(await this.say(run, retry))) return;
+        heard = await this.listenCommand(run);
+        if (heard === null) return;
+        this._transcript.set(heard);
+        intent = heard ? parseCommand(heard, this.context()) : { kind: 'unknown' };
+      }
+
+      this._phase.set('thinking');
+      const askMore = await this.handle(run, intent);
+      if (run !== this.run || !askMore) return;
+
+      const next = await this.askAnythingElse(run);
+      if (next === null) return;
+      carried = next || null; // '' = «sí, dime»: se escucha la próxima orden
+    }
+  }
+
+  /**
+   * «¿Necesitas algo más?». Devuelve `null` si la conversación termina (dijo que no, se
+   * despidió, se calló o se abandonó), `''` si quiere seguir y hay que escuchar la orden, o
+   * la frase ya dicha cuando respondió directamente con otra orden.
+   */
+  private async askAnythingElse(run: number): Promise<string | null> {
+    this.recognition.prepare(FOLLOW_UP_HINTS);
+    if (!(await this.say(run, ASSISTANT_TEXT.anythingElse, false))) return null;
+    const heard = await this.listenSafe(run, FOLLOW_UP_HINTS);
+    if (run !== this.run || heard === null) return null;
+    if (!heard) {
+      // se quedó callado: se despide y apaga el micrófono
+      await this.say(run, ASSISTANT_TEXT.bye, false);
+      return null;
+    }
+    this._transcript.set(heard);
+
+    // Una orden completa vale como respuesta («sí, léeme los gastos» o «léeme los gastos»)
+    const intent = parseCommand(heard, this.context());
+    if (intent.kind === 'stop' || intent.kind === 'thanks') {
+      await this.say(run, ASSISTANT_TEXT.bye, false);
+      return null;
+    }
+    if (intent.kind !== 'unknown' && intent.kind !== 'greeting') return heard;
+
+    const answer = parseConfirmation(heard);
+    if (answer === 'yes') {
+      this.recognition.prepare(this.commandHints());
+      await this.say(run, ASSISTANT_TEXT.listening, false);
+      return run === this.run ? '' : null;
+    }
+    if (answer === 'no') {
+      await this.say(run, ASSISTANT_TEXT.bye, false);
+      return null;
+    }
+    return heard; // algo que no es sí/no/orden: que el flujo normal lo intente entender
   }
 
   /** Escucha una orden: `''` si no se entendió nada, `null` si se abandonó. */
@@ -165,7 +215,7 @@ export class AssistantService {
     }
   }
 
-  private async handle(run: number, intent: Intent): Promise<void> {
+  private async handle(run: number, intent: Intent): Promise<boolean> {
     const today = this.clock.today();
     const currency = this.auth.currency();
     const name = (id: string) => this.cats.byId().get(id)?.name;
@@ -191,7 +241,7 @@ export class AssistantService {
             today,
           ),
         );
-        return;
+        return true;
       }
       case 'query_totals':
         await this.say(
@@ -205,34 +255,34 @@ export class AssistantService {
             today,
           ),
         );
-        return;
+        return true;
       case 'query_extreme':
         await this.say(
           run,
           extremeAnswer(this.txs.visible(), intent.type, intent.period, name, currency, today),
         );
-        return;
+        return true;
       case 'query_count':
         await this.say(run, countAnswer(this.txs.visible(), intent.type, intent.period, today));
-        return;
+        return true;
       case 'compare':
         await this.say(
           run,
           compareAnswer(this.txs.visible(), intent.metric, intent.period, currency, today),
         );
-        return;
+        return true;
       case 'greeting':
         await this.say(run, ASSISTANT_TEXT.greeting);
-        return;
+        return true;
       case 'thanks':
         await this.say(run, ASSISTANT_TEXT.thanks);
-        return;
+        return false; // se despidió: no pregunta «¿algo más?» y apaga el micrófono
       case 'delete_help':
         await this.say(run, ASSISTANT_TEXT.deleteHelp);
-        return;
+        return true;
       case 'query_top':
         await this.say(run, topAnswer(this.txs.visible(), intent.period, name, currency, today));
-        return;
+        return true;
       case 'query_budget':
         await this.say(
           run,
@@ -245,34 +295,32 @@ export class AssistantService {
             currency,
           ),
         );
-        return;
+        return true;
       case 'navigate':
         await this.router.navigateByUrl(intent.route);
         await this.say(run, `Abriendo ${intent.label}`);
-        return;
+        return true;
       case 'add_transaction':
-        await this.addTransaction(run, intent.draft);
-        return;
+        return this.addTransaction(run, intent.draft);
       case 'delete_last':
-        await this.deleteLast(run, intent.type);
-        return;
+        return this.deleteLast(run, intent.type);
       case 'repeat':
         await this.say(run, this.lastReply || ASSISTANT_TEXT.nothingToRepeat);
-        return;
+        return true;
       case 'help':
         await this.say(run, ASSISTANT_TEXT.help);
-        return;
+        return true;
       case 'stop':
-        return;
+        return false;
       case 'unknown':
         await this.say(run, ASSISTANT_TEXT.unknown);
-        return;
+        return false; // ya se le dio dos oportunidades y ejemplos: no insiste
     }
   }
 
   // --- Alta por voz (borrador → «sí» → guardar) ---------------------------------
 
-  private async addTransaction(run: number, draft: VoiceDraft): Promise<void> {
+  private async addTransaction(run: number, draft: VoiceDraft): Promise<boolean> {
     const today = this.clock.today();
     const currency = this.auth.currency();
     let amount = draft.amountMinor;
@@ -281,14 +329,14 @@ export class AssistantService {
       const ask =
         draft.type === 'income' ? ASSISTANT_TEXT.askAmountIncome : ASSISTANT_TEXT.askAmountExpense;
       this.recognition.prepare(AMOUNT_HINTS);
-      if (!(await this.say(run, ask))) return;
+      if (!(await this.say(run, ask))) return false;
       const heard = await this.listenSafe(run, AMOUNT_HINTS);
-      if (run !== this.run || heard === null) return;
+      if (run !== this.run || heard === null) return false;
       amount = parseSpokenAmount(heard);
       if (amount === null) {
         await this.say(run, ASSISTANT_TEXT.noAmount);
         if (run === this.run) await this.router.navigateByUrl('/movimientos/nuevo');
-        return;
+        return false;
       }
     }
 
@@ -305,7 +353,7 @@ export class AssistantService {
     );
     if (hasErrors(errors)) {
       await this.say(run, Object.values(errors)[0] as string);
-      return;
+      return true;
     }
 
     const categoryName = this.cats.byId().get(draft.categoryId as string)?.name;
@@ -321,10 +369,10 @@ export class AssistantService {
       today,
     );
     const answer = await this.confirm(run, `${summary}. ${ASSISTANT_TEXT.confirmSuffix}`);
-    if (answer === null) return;
+    if (answer === null) return false;
     if (!answer) {
       await this.say(run, ASSISTANT_TEXT.cancelled);
-      return;
+      return true;
     }
 
     const saved = await this.txs.save({
@@ -347,17 +395,18 @@ export class AssistantService {
     void this.sync.sync();
     const done = saved.type === 'income' ? ASSISTANT_TEXT.savedIncome : ASSISTANT_TEXT.savedExpense;
     await this.say(run, [done, ...alerts].join('. '));
+    return true;
   }
 
   // --- Eliminar el último (confirmación + Deshacer de HU07) -----------------------
 
-  private async deleteLast(run: number, type: TypeFilter): Promise<void> {
+  private async deleteLast(run: number, type: TypeFilter): Promise<boolean> {
     const target = this.txs
       .visible()
       .find((t) => t.status === 'confirmed' && (type === 'all' || t.type === type));
     if (!target) {
       await this.say(run, ASSISTANT_TEXT.nothingToDelete);
-      return;
+      return true;
     }
     const summary = formatTransactionForSpeech(
       target,
@@ -369,15 +418,16 @@ export class AssistantService {
       run,
       `Vas a eliminar: ${summary}. ${ASSISTANT_TEXT.confirmSuffix}`,
     );
-    if (answer === null) return;
+    if (answer === null) return false;
     if (!answer) {
       await this.say(run, ASSISTANT_TEXT.cancelled);
-      return;
+      return true;
     }
     await this.txs.remove(target);
     this.toast.undo('Movimiento eliminado', () => void this.txs.restore(target));
     void this.sync.sync();
     await this.say(run, ASSISTANT_TEXT.deleted);
+    return true;
   }
 
   // --- Piezas de la conversación ----------------------------------------------------
@@ -461,9 +511,10 @@ export class AssistantService {
   }
 
   /** Dice el texto. `false` si la conversación se abandonó mientras hablaba. */
-  private async say(run: number, text: string): Promise<boolean> {
+  private async say(run: number, text: string, remember = true): Promise<boolean> {
     if (run !== this.run) return false;
-    this.lastReply = text;
+    // «Repite» vuelve a decir la última RESPUESTA, no el «¿algo más?» ni la despedida
+    if (remember) this.lastReply = text;
     this._reply.set(text);
     this._phase.set('speaking');
     await this.synthesis.announce(text);
@@ -485,6 +536,18 @@ export class AssistantService {
     this._error.set(speechMessage(e, 'dictation'));
   }
 }
+
+/** Tope de órdenes seguidas en una misma conversación (evita un bucle sin fin). */
+const MAX_ROUNDS = 8;
+const FOLLOW_UP_HINTS = [
+  'sí',
+  'no',
+  'nada más',
+  'gracias',
+  'léeme',
+  'agrega un gasto',
+  'muéstrame',
+];
 
 const CONFIRM_HINTS = ['sí', 'no', 'correcto', 'cancela', 'dale', 'confirmo', 'claro'];
 const AMOUNT_HINTS = ['mil', 'millones', 'pesos', 'cien mil', 'cincuenta mil', 'veinte mil'];
