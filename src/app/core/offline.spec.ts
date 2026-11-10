@@ -56,16 +56,21 @@ describe('capa sin conexión', () => {
   let store: LocalStore;
   let clock: FakeClock;
   const api = { push: vi.fn(), pull: vi.fn() };
+  let authenticated = true;
 
   beforeEach(async () => {
     api.push.mockReset();
     api.pull.mockReset();
+    authenticated = true;
     clock = new FakeClock();
     TestBed.configureTestingModule({
       providers: [
         { provide: Clock, useValue: clock },
         { provide: Api, useValue: api },
-        { provide: AuthService, useValue: { isAuthenticated: () => true, currency: () => 'COP' } },
+        {
+          provide: AuthService,
+          useValue: { isAuthenticated: () => authenticated, currency: () => 'COP' },
+        },
       ],
     });
     db = TestBed.inject(Db);
@@ -140,6 +145,26 @@ describe('capa sin conexión', () => {
       version: 10,
     });
     const empty: PullResponse = { changes: [], next_since: 0, has_more: false };
+
+    it('start() sin sesión no impide la primera sincronización cuando se inicia sesión', async () => {
+      // regresión: el start() del arranque (sin sesión) dejaba sin efecto al del shell y una
+      // cuenta recién iniciada se veía vacía (sin categorías) hasta 60 s después
+      const interval = vi.spyOn(globalThis, 'setInterval').mockReturnValue(0 as never);
+      api.push.mockResolvedValue(pushOk([]));
+      api.pull.mockResolvedValue(empty);
+      const sync = TestBed.inject(SyncService);
+
+      authenticated = false;
+      sync.start(); // arranque de la app: todavía sin sesión
+      await new Promise((r) => setTimeout(r, 20));
+      expect(api.pull).not.toHaveBeenCalled();
+
+      authenticated = true;
+      sync.start(); // el shell, ya con sesión
+      await vi.waitFor(() => expect(api.pull).toHaveBeenCalledTimes(1));
+      expect(interval).toHaveBeenCalledTimes(1); // los disparadores se enganchan una sola vez
+      interval.mockRestore();
+    });
 
     it('push aplicado: marca synced y vacía el outbox', async () => {
       await store.upsert('transaction', tx('t1'));

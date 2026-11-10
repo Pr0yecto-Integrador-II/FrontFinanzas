@@ -43,19 +43,26 @@ export class SyncService {
   );
   readonly offline = computed(() => !this.online());
 
-  /** Engancha los disparadores automáticos. Es idempotente. */
+  /**
+   * Engancha los disparadores automáticos (una sola vez) y sincroniza ya.
+   *
+   * Se llama al arrancar la app y otra vez desde el shell. La primera vez puede ser SIN sesión
+   * (y entonces `sync()` no hace nada); si la segunda llamada no sincronizara, quien inicia
+   * sesión vería su cuenta vacía hasta 60 s, hasta el siguiente intervalo.
+   */
   start(): void {
-    if (this.started) return;
-    this.started = true;
-    window.addEventListener('online', () => {
-      this.online.set(true);
-      void this.sync();
-    });
-    window.addEventListener('offline', () => this.online.set(false));
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void this.sync();
-    });
-    setInterval(() => void this.sync(), INTERVAL_MS);
+    if (!this.started) {
+      this.started = true;
+      window.addEventListener('online', () => {
+        this.online.set(true);
+        void this.sync();
+      });
+      window.addEventListener('offline', () => this.online.set(false));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') void this.sync();
+      });
+      setInterval(() => void this.sync(), INTERVAL_MS);
+    }
     void this.sync();
   }
 
