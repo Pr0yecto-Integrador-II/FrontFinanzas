@@ -43,6 +43,13 @@ export interface SpeechTokenResponse {
   expires_in_seconds: number;
 }
 
+/** Respuesta de `POST /vision/analyze` (MVP 3, HU20). Nunca incluye la imagen. */
+export interface ImageAnalysisResponse {
+  ocr_lines: string[];
+  tags: { name: string; confidence: number }[];
+  caption: string | null;
+}
+
 /** Error normalizado de la API. `status` 0 = sin conexión con el servidor. */
 export class ApiError extends Error {
   constructor(
@@ -168,6 +175,17 @@ export class Api {
   speechToken(): Promise<SpeechTokenResponse> {
     return this.call(
       firstValueFrom(this.http.post<SpeechTokenResponse>(`${this.base}/speech/token`, {})),
+    );
+  }
+
+  /** La imagen viaja cruda en el cuerpo (`image/jpeg` o `image/png`), sin multipart. */
+  analyzeImage(image: Blob): Promise<ImageAnalysisResponse> {
+    return this.call(
+      firstValueFrom(
+        this.http.post<ImageAnalysisResponse>(`${this.base}/vision/analyze`, image, {
+          headers: { 'Content-Type': image.type || 'image/jpeg' },
+        }),
+      ),
     );
   }
 
