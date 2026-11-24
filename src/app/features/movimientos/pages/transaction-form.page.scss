@@ -332,3 +332,8 @@
     min-width: 200px;
   }
 }
+
+/* El selector de archivos real queda oculto; lo abre el botón "Foto de la compra". */
+.photo-input {
+  display: none;
+}

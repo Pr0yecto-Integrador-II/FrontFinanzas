@@ -47,6 +47,43 @@
         <span id="voice-state" class="voice-state" [class.live]="dictation() !== 'idle'" aria-live="polite">
           {{ dictationLabel() }}
         </span>
+        <input
+          #photoInput
+          type="file"
+          accept="image/*"
+          capture="environment"
+          class="photo-input"
+          tabindex="-1"
+          aria-hidden="true"
+          (change)="onPhoto($event)"
+        />
+        <button
+          type="button"
+          class="btn soft voice-btn"
+          [class.off]="offline()"
+          [disabled]="analyzing()"
+          aria-describedby="photo-state"
+          (click)="photoInput.click()"
+        >
+          <span class="icon" aria-hidden="true">photo_camera</span>
+          Foto de la compra
+        </button>
+        <span id="photo-state" class="voice-state" [class.live]="analyzing()" aria-live="polite">
+          {{ analyzing() ? 'Analizando la foto...' : '' }}
+        </span>
+        @if (receipt()) {
+          <button
+            type="button"
+            class="btn soft voice-btn"
+            [class.live]="readingReceipt()"
+            [class.off]="offline()"
+            [attr.aria-pressed]="readingReceipt()"
+            (click)="toggleReadReceipt()"
+          >
+            <span class="icon" aria-hidden="true">{{ readingReceipt() ? 'stop_circle' : 'volume_up' }}</span>
+            {{ readingReceipt() ? 'Detener lectura' : 'Escuchar lo detectado' }}
+          </button>
+        }
       } @else if (existing()) {
         <button
           type="button"

@@ -24,6 +24,8 @@ import { SPEECH_TEXT, speechMessage } from '../../../core/speech/speech-errors';
 import { SpeechRecognitionService } from '../../../core/speech/speech-recognition.service';
 import { SpeechSynthesisService } from '../../../core/speech/speech-synthesis.service';
 import { SyncService } from '../../../core/sync.service';
+import { VISION_TEXT, visionMessage } from '../../../core/vision/vision-errors';
+import { VisionService } from '../../../core/vision/vision.service';
 import { Dialogs } from '../../../shared/confirm-dialog';
 import { Toast } from '../../../shared/toast.service';
 import { CategoryRepo } from '../../categorias/data/category.repo';
@@ -40,11 +42,15 @@ import {
   hasErrors,
   validateTx,
 } from '../domain/rules';
+import { ReceiptDraft, buildReceiptDraft, describeReceipt } from '../domain/receipt';
 import {
   VoiceDraft,
   formatTransactionForSpeech,
   parseVoiceTransactionDraft,
 } from '../domain/voice';
+
+/** Identificador de la lectura de lo detectado en la foto (HU25). */
+const RECEIPT_SPEECH_ID = 'receipt-draft';
 
 const DICTATION_LABEL = { idle: 'Listo', listening: 'Escuchando...', processing: 'Procesando...' };
 
@@ -73,6 +79,7 @@ export class TransactionFormPage {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly recognition = inject(SpeechRecognitionService);
   private readonly synthesis = inject(SpeechSynthesisService);
+  private readonly vision = inject(VisionService);
 
   // --- Voz (MVP 2): dictado al crear (HU17) y lectura al consultar (HU18) ---
   protected readonly offline = this.sync.offline;
@@ -84,6 +91,16 @@ export class TransactionFormPage {
       this.synthesis.mode() === 'single' &&
       this.synthesis.active() &&
       this.synthesis.activeId() === this.existing()?.id,
+  );
+
+  // --- Fotos (MVP 3): compra o recibo → borrador (HU21) y lectura de lo detectado (HU25) ---
+  protected readonly analyzing = signal(false);
+  protected readonly receipt = signal<ReceiptDraft | null>(null);
+  protected readonly readingReceipt = computed(
+    () =>
+      this.synthesis.mode() === 'single' &&
+      this.synthesis.active() &&
+      this.synthesis.activeId() === RECEIPT_SPEECH_ID,
   );
 
   protected readonly today = this.clock.today();
@@ -344,6 +361,76 @@ export class TransactionFormPage {
     } catch (e) {
       // Lo que ya esté en el formulario se conserva para completarlo a mano
       this.voiceMessage.set(speechMessage(e, 'dictation'));
+    }
+  }
+
+  /**
+   * HU21: analiza la foto y prellena el formulario. La foto vive solo en memoria y el
+   * resultado es un borrador: nunca se guarda sin que el usuario presione "Guardar".
+   */
+  protected async onPhoto(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // permite elegir la misma foto otra vez
+    if (!file) return;
+    this.voiceMessage.set(null);
+    this.synthesis.stop();
+    this.receipt.set(null);
+    this.analyzing.set(true);
+    try {
+      const analysis = await this.vision.analyze(file);
+      const draft = buildReceiptDraft(
+        analysis,
+        this.cats.active(),
+        this.today,
+        this.repo.lastUsedCategory('expense'),
+      );
+      if (draft.empty) {
+        this.voiceMessage.set(VISION_TEXT.nothingDetected);
+        return;
+      }
+      this.receipt.set(draft);
+      this.applyDraft(draft);
+      if (draft.amountMinor !== null) {
+        const name = draft.suggestedTag ? this.cats.byId().get(draft.categoryId ?? '')?.name : null;
+        this.voiceMessage.set(
+          name
+            ? `${VISION_TEXT.reviewDraft}. Categoría sugerida: ${name}`
+            : VISION_TEXT.reviewDraft,
+        );
+      } else {
+        this.voiceMessage.set(VISION_TEXT.noAmount);
+      }
+    } catch (e) {
+      // Lo que ya esté en el formulario se conserva para completarlo a mano
+      this.voiceMessage.set(visionMessage(e));
+    } finally {
+      this.analyzing.set(false);
+    }
+  }
+
+  /** HU25: lee en voz alta lo detectado en la foto, antes de guardar. Nunca es automático. */
+  protected async toggleReadReceipt(): Promise<void> {
+    const draft = this.receipt();
+    if (!draft) return;
+    if (this.readingReceipt()) {
+      this.synthesis.stop();
+      return;
+    }
+    this.voiceMessage.set(null);
+    if (this.offline()) {
+      this.voiceMessage.set(SPEECH_TEXT.offlineReading);
+      return;
+    }
+    const text = describeReceipt(
+      draft,
+      this.cats.byId().get(draft.categoryId ?? '')?.name,
+      this.auth.currency(),
+    );
+    try {
+      await this.synthesis.speakOne(RECEIPT_SPEECH_ID, text);
+    } catch (e) {
+      this.voiceMessage.set(speechMessage(e, 'reading'));
     }
   }
 
